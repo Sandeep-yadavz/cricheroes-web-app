@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RotateCcw, UserCheck, Shield, Trophy, CheckCircle2, Flame, RefreshCw } from 'lucide-react';
+import { RotateCcw, UserCheck, Shield, Trophy, CheckCircle2, Flame } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import WicketModal from './WicketModal';
 import MatchWinnerModal from './MatchWinnerModal';
@@ -10,6 +10,7 @@ export default function ScorerControl() {
   const { match, teams, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser } = useCricket();
   const [selectedShotZone, setSelectedShotZone] = useState('Cover');
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [showNoBallOptions, setShowNoBallOptions] = useState(false);
 
   const currKey = `innings_${match.current_innings || 1}`;
   const inn = match[currKey] || match.innings_1 || { runs: 0, wickets: 0, overs: 0.0 };
@@ -28,6 +29,7 @@ export default function ScorerControl() {
       is_wicket: false,
       shot_zone: selectedShotZone
     });
+    setShowNoBallOptions(false);
   };
 
   const crr = inn.overs > 0 ? (inn.runs / (Math.floor(inn.overs) + (inn.overs % 1) * (10 / 6))).toFixed(2) : "0.00";
@@ -45,7 +47,7 @@ export default function ScorerControl() {
             <div className="flex items-center space-x-2">
               <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider">Official Scorer Console</span>
               <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#00D26A]/20 text-[#00D26A] border border-[#00D26A]/40 uppercase flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Live Scoring
+                <CheckCircle2 className="w-3 h-3" /> Live Scoring Active
               </span>
             </div>
             <h2 className="text-2xl font-heading font-black text-white">Match Scorer Console</h2>
@@ -141,12 +143,30 @@ export default function ScorerControl() {
           <button onClick={() => setIsWicketModalOpen(true)} className="py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-heading font-black text-lg col-span-2 sm:col-span-1 shadow-lg shadow-red-600/30 active:scale-95 transition">WKT</button>
         </div>
 
-        {/* Extras Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-          <button onClick={() => onScore(0, 'wide')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">WD (Wide)</button>
-          <button onClick={() => onScore(0, 'noball')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-orange-400 font-extrabold text-xs border border-slate-800 active:scale-95 transition">NB (No Ball)</button>
-          <button onClick={() => onScore(1, 'bye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">B (Bye)</button>
-          <button onClick={() => onScore(1, 'legbye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">LB (Leg Bye)</button>
+        {/* Extras & No Ball Combo Row */}
+        <div className="space-y-3 pt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button onClick={() => onScore(0, 'wide')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">WD (Wide)</button>
+            <button onClick={() => setShowNoBallOptions(!showNoBallOptions)} className="py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-black font-extrabold text-xs shadow-md shadow-orange-500/20 active:scale-95 transition">⚡ NB (No Ball + Runs)</button>
+            <button onClick={() => onScore(1, 'bye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">B (Bye)</button>
+            <button onClick={() => onScore(1, 'legbye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">LB (Leg Bye)</button>
+          </div>
+
+          {/* No-Ball Options Sub-Row: No Ball + 0, No Ball + 1, No Ball + 2, No Ball + 4, No Ball + 6 */}
+          {showNoBallOptions && (
+            <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/30 space-y-2 animate-fadeIn">
+              <span className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider block">
+                Select Runs Scored Off No-Ball (1 Extra Penalty Added Automatically)
+              </span>
+              <div className="grid grid-cols-5 gap-2">
+                <button onClick={() => onScore(0, 'noball')} className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-orange-300 font-extrabold text-xs border border-slate-800">NB + 0</button>
+                <button onClick={() => onScore(1, 'noball')} className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-orange-300 font-extrabold text-xs border border-slate-800">NB + 1</button>
+                <button onClick={() => onScore(2, 'noball')} className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-orange-300 font-extrabold text-xs border border-slate-800">NB + 2</button>
+                <button onClick={() => onScore(4, 'noball')} className="py-2.5 rounded-xl bg-orange-500 text-black font-extrabold text-xs shadow-md">NB + 4 🚀</button>
+                <button onClick={() => onScore(6, 'noball')} className="py-2.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs shadow-md">NB + 6 💥</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

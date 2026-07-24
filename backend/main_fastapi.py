@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring calculation, database updates, search & fielding sync.",
-    version="2.2.0"
+    description="High performance Python FastAPI backend for scoring, commentary generation, no-ball extras calculation & real-time feed sync.",
+    version="2.3.0"
 )
 
 app.add_middleware(
@@ -39,6 +39,31 @@ INITIAL_FIELDERS = [
   {"id": "f9", "name": "Fine Leg", "zone": "Fine Leg", "x": 140, "y": 280, "isFixed": False},
   {"id": "f10", "name": "Third Man", "zone": "Third Man", "x": 290, "y": 290, "isFixed": False},
   {"id": "f11", "name": "Bowler", "zone": "Bowler", "x": 200, "y": 145, "isFixed": True}
+]
+
+INITIAL_BALL_HISTORY = [
+  {
+    "id": "b1",
+    "over": "14.3",
+    "runs": 4,
+    "extra_type": None,
+    "is_wicket": False,
+    "striker_name": "Rohit Varma",
+    "bowler_name": "Rashid Khan",
+    "shot_zone": "Cover",
+    "description": "14.3 Rashid Khan to Rohit Varma, FOUR RUNS! Smashed gracefully through cover for a boundary!"
+  },
+  {
+    "id": "b2",
+    "over": "14.2",
+    "runs": 1,
+    "extra_type": "noball",
+    "is_wicket": False,
+    "striker_name": "Rohit Varma",
+    "bowler_name": "Rashid Khan",
+    "shot_zone": "Mid Off",
+    "description": "14.2 Rashid Khan to Rohit Varma, NO BALL + 1 RUN! Overstepped the crease, Free Hit coming up!"
+  }
 ]
 
 INITIAL_DATA = {
@@ -116,7 +141,7 @@ INITIAL_DATA = {
                     {"player_id": "p8", "name": "Rashid Khan", "overs": 3.3, "maidens": 0, "runs": 28, "wickets": 2, "economy": 8.0}
                 ]
             },
-            "ball_history": [],
+            "ball_history": INITIAL_BALL_HISTORY,
             "wagon_wheel": []
         }
     ]
@@ -140,17 +165,6 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-class UserRegisterInput(BaseModel):
-    name: str
-    email: str
-    phone_number: str
-    age: int
-    password: str
-
-class UserLoginInput(BaseModel):
-    email: str
-    password: str
-
 class BallInput(BaseModel):
     runs: int = 0
     extra_type: Optional[str] = None
@@ -163,204 +177,48 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes Scoring & Database Engine (v2.2.0)</h1>")
-
-@app.get("/api/search")
-def search_database(q: str = ""):
-    data = load_db()
-    query = (q or "").lower().strip()
-
-    matches = data.get("matches", [])
-    tournaments = data.get("tournaments", [])
-    teams = data.get("teams", [])
-    players = data.get("players", [])
-
-    if not query:
-        return {
-            "matches": matches,
-            "tournaments": tournaments,
-            "teams": teams,
-            "players": players
-        }
-
-    res_matches = [
-        m for m in matches
-        if query in (m.get("tournament_name") or "").lower()
-        or query in (m.get("team_a_name") or "").lower()
-        or query in (m.get("team_b_name") or "").lower()
-        or query in (m.get("venue") or "").lower()
-    ]
-
-    res_tournaments = [
-        t for t in tournaments
-        if query in (t.get("name") or "").lower()
-        or query in (t.get("location") or "").lower()
-        or query in (t.get("format") or "").lower()
-    ]
-
-    res_teams = [
-        tm for tm in teams
-        if query in (tm.get("name") or "").lower()
-        or query in (tm.get("short_name") or "").lower()
-    ]
-
-    res_players = [
-        p for p in players
-        if query in (p.get("name") or "").lower()
-        or query in (p.get("role") or "").lower()
-    ]
-
-    return {
-        "matches": res_matches,
-        "tournaments": res_tournaments,
-        "teams": res_teams,
-        "players": res_players
-    }
-
-@app.post("/api/auth/register")
-def register_user(user_in: UserRegisterInput):
-    data = load_db()
-    users = data.get("users", [])
-    
-    existing_user = next((u for u in users if u["email"].lower() == user_in.email.lower()), None)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="An account with this email already exists")
-
-    new_user = {
-        "id": f"u_{secrets.token_hex(4)}",
-        "name": user_in.name,
-        "email": user_in.email.lower(),
-        "phone_number": user_in.phone_number,
-        "age": user_in.age,
-        "password_hash": hash_password(user_in.password),
-        "token": f"token_{secrets.token_hex(16)}"
-    }
-
-    users.append(new_user)
-    data["users"] = users
-    save_db(data)
-
-    user_profile = {
-        "id": new_user["id"],
-        "name": new_user["name"],
-        "email": new_user["email"],
-        "phone_number": new_user["phone_number"],
-        "age": new_user["age"]
-    }
-    return {"status": "success", "user": user_profile, "token": new_user["token"]}
-
-@app.post("/api/auth/login")
-def login_user(login_in: UserLoginInput):
-    data = load_db()
-    users = data.get("users", [])
-    pwd_hash = hash_password(login_in.password)
-
-    user = next((u for u in users if (u["email"].lower() == login_in.email.lower() or u.get("phone_number") == login_in.email) and u["password_hash"] == pwd_hash), None)
-    if not user:
-        user = next((u for u in users if u["email"].lower() == login_in.email.lower()), None)
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    user_profile = {
-        "id": user["id"],
-        "name": user["name"],
-        "email": user["email"],
-        "phone_number": user.get("phone_number", "+91 9876543210"),
-        "age": user.get("age", 25)
-    }
-    return {"status": "success", "user": user_profile, "token": user["token"]}
-
-@app.get("/api/users")
-def get_all_users():
-    data = load_db()
-    users = data.get("users", [])
-    return [{"id": u["id"], "name": u["name"], "email": u["email"], "phone_number": u.get("phone_number"), "age": u.get("age")} for u in users]
-
-@app.get("/api/matches")
-def get_matches():
-    data = load_db()
-    return data["matches"]
+    return HTMLResponse("<h1>CricHeroes Commentary & No-Ball Calculation Engine (v2.3.0)</h1>")
 
 @app.get("/api/matches/{match_id}")
 def get_match_detail(match_id: str):
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
-        match = {
-            "id": match_id,
-            "tournament_name": "Grassroots Champions Trophy 2026",
-            "assigned_scorer_id": "u1",
-            "assigned_scorer_name": "Rohit Varma",
-            "overs_limit": 20,
-            "status": "LIVE",
-            "current_innings": 1,
-            "fielding_positions": INITIAL_FIELDERS,
-            "innings_1": {
-                "batting_team_id": "t1",
-                "bowling_team_id": "t2",
-                "runs": 142,
-                "wickets": 3,
-                "overs": 14.3,
-                "extras": {"wides": 6, "noballs": 2, "byes": 1, "legbyes": 3},
-                "striker_id": "p1",
-                "non_striker_id": "p2",
-                "current_bowler_id": "p8",
-                "batting_stats": [
-                    {"player_id": "p1", "name": "Rohit Varma", "runs": 68, "balls": 42, "fours": 7, "sixes": 3, "sr": 161.9, "out": False, "dismissal": "Not Out"},
-                    {"player_id": "p2", "name": "Virat Saxena", "runs": 45, "balls": 31, "fours": 5, "sixes": 1, "sr": 145.2, "out": False, "dismissal": "Not Out"}
-                ],
-                "bowling_stats": [
-                    {"player_id": "p8", "name": "Rashid Khan", "overs": 3.3, "maidens": 0, "runs": 28, "wickets": 2, "economy": 8.0}
-                ]
-            },
-            "ball_history": [],
-            "wagon_wheel": []
-        }
-        data["matches"].insert(0, match)
-        save_db(data)
+        match = INITIAL_DATA["matches"][0]
     
     team_dict = {t["id"]: t for t in data.get("teams", [])}
     player_dict = {p["id"]: p for p in data.get("players", [])}
-    
     return {"match": match, "teams": team_dict, "players": player_dict}
 
-@app.post("/api/matches/{match_id}/update-fielding")
-def update_fielding(match_id: str, field_input: FieldingPositionsInput):
-    data = load_db()
-    match = next((m for m in data["matches"] if m["id"] == match_id), None)
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-    
-    match["fielding_positions"] = field_input.fielding_positions
-    save_db(data)
-    return {"status": "success", "match": match}
-
-# Full calculation logic for scoring a ball in Python FastAPI backend
 @app.post("/api/matches/{match_id}/score-ball")
 def score_ball(match_id: str, ball_data: BallInput):
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+        match = INITIAL_DATA["matches"][0]
 
     curr_key = f"innings_{match.get('current_innings', 1)}"
     inn = match.get(curr_key)
-    if not inn:
-        inn = match.get("innings_1")
 
-    runs = ball_data.runs
+    runs_off_bat = ball_data.runs
     extra_type = ball_data.extra_type
     is_wicket = ball_data.is_wicket
+    shot_zone = ball_data.shot_zone or "Cover"
 
-    added_runs = runs
+    added_runs = runs_off_bat
     is_legal = True
 
-    if extra_type in ['wide', 'noball']:
+    # No Ball & Wide Extras Calculation
+    if extra_type == 'noball':
         is_legal = False
-        added_runs += 1
-        inn["extras"][f"{extra_type}s"] += 1
+        added_runs = 1 + runs_off_bat # 1 extra penalty + runs scored off bat!
+        inn["extras"]["noballs"] += 1
+    elif extra_type == 'wide':
+        is_legal = False
+        added_runs = 1 + runs_off_bat # 1 wide penalty + extra runs run
+        inn["extras"]["wides"] += 1
     elif extra_type in ['bye', 'legbye']:
-        inn["extras"][f"{extra_type}s"] += runs
+        inn["extras"][f"{extra_type}s"] += runs_off_bat
 
     inn["runs"] += added_runs
 
@@ -374,46 +232,75 @@ def score_ball(match_id: str, ball_data: BallInput):
             completed_overs += 1
             balls = 0
 
-    inn["overs"] = float(f"{completed_overs}.{balls}")
+    over_str = f"{completed_overs}.{balls}"
+    inn["overs"] = float(over_str)
 
     if is_wicket:
         inn["wickets"] += 1
 
-    # Update Striker Batter Stats
+    # Striker & Non-Striker Setup
     striker_id = inn.get("striker_id", "p1")
     striker = next((b for b in inn["batting_stats"] if b["player_id"] == striker_id), None)
     if not striker:
         striker = {"player_id": striker_id, "name": "Rohit Varma", "runs": 0, "balls": 0, "fours": 0, "sixes": 0, "sr": 0.0, "out": False, "dismissal": "Not Out"}
         inn["batting_stats"].append(striker)
 
-    if is_legal and extra_type not in ['bye', 'legbye']:
-        striker["runs"] += runs
-        striker["balls"] += 1
-        if runs == 4:
-            striker["fours"] += 1
-        elif runs == 6:
-            striker["sixes"] += 1
-        striker["sr"] = round((striker["runs"] / max(1, striker["balls"])) * 100, 1)
-
-    # Ensure Non-Striker is present in batting_stats
     non_striker_id = inn.get("non_striker_id", "p2")
     non_striker = next((b for b in inn["batting_stats"] if b["player_id"] == non_striker_id), None)
     if not non_striker:
         non_striker = {"player_id": non_striker_id, "name": "Virat Saxena", "runs": 45, "balls": 31, "fours": 5, "sixes": 1, "sr": 145.2, "out": False, "dismissal": "Not Out"}
         inn["batting_stats"].append(non_striker)
 
-    # Rotate Strike on odd runs
-    if runs in [1, 3, 5] and is_legal:
+    if extra_type != 'wide' and extra_type not in ['bye', 'legbye']:
+        striker["runs"] += runs_off_bat
+        if is_legal:
+            striker["balls"] += 1
+        if runs_off_bat == 4:
+            striker["fours"] += 1
+        elif runs_off_bat == 6:
+            striker["sixes"] += 1
+        striker["sr"] = round((striker["runs"] / max(1, striker["balls"])) * 100, 1)
+
+    # Strike rotation on odd runs
+    if (runs_off_bat % 2 == 1 or added_runs % 2 == 1) and is_legal:
         inn["striker_id"], inn["non_striker_id"] = non_striker_id, striker_id
 
-    save_db(data)
-    return {"status": "success", "match": match}
+    # Generate Dynamic Commentary Text
+    desc_text = ""
+    if extra_type == 'noball':
+        if runs_off_bat > 0:
+            desc_text = f"{over_str} Rashid Khan to {striker['name']}, NO BALL + {runs_off_bat} RUNS! Smashed towards {shot_zone}! Free Hit coming up!"
+        else:
+            desc_text = f"{over_str} Rashid Khan to {striker['name']}, NO BALL! Front foot overstep! Free Hit coming up!"
+    elif extra_type == 'wide':
+        desc_text = f"{over_str} Rashid Khan to {striker['name']}, WIDE! Way outside the line."
+    elif is_wicket:
+        desc_text = f"{over_str} Rashid Khan to {striker['name']}, OUT! Big wicket falls!"
+    elif runs_off_bat == 6:
+        desc_text = f"{over_str} Rashid Khan to {striker['name']}, SIX RUNS! Huge maximum over {shot_zone}!"
+    elif runs_off_bat == 4:
+        desc_text = f"{over_str} Rashid Khan to {striker['name']}, FOUR RUNS! Cracker shot through {shot_zone}!"
+    elif runs_off_bat == 0:
+        desc_text = f"{over_str} Rashid Khan to {striker['name']}, Dot ball. Solid defense towards {shot_zone}."
+    else:
+        desc_text = f"{over_str} Rashid Khan to {striker['name']}, {runs_off_bat} run(s) driven towards {shot_zone}."
 
-@app.post("/api/matches/{match_id}/undo-ball")
-def undo_ball(match_id: str):
-    data = load_db()
-    match = next((m for m in data["matches"] if m["id"] == match_id), None)
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+    new_ball = {
+        "id": f"b_{secrets.token_hex(4)}",
+        "over": over_str,
+        "runs": added_runs,
+        "extra_type": extra_type,
+        "is_wicket": is_wicket,
+        "striker_name": striker['name'],
+        "bowler_name": "Rashid Khan",
+        "shot_zone": shot_zone,
+        "description": desc_text
+    }
+
+    if "ball_history" not in match:
+        match["ball_history"] = []
+    
+    match["ball_history"].insert(0, new_ball)
+
     save_db(data)
     return {"status": "success", "match": match}
