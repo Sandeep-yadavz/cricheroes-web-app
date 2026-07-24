@@ -28,7 +28,9 @@ const INITIAL_TEAMS = {
 
 const INITIAL_PLAYERS = {
   p1: { id: "p1", name: "Rohit Varma", team_id: "t1", role: "Batter", runs: 842, wickets: 4, highest_score: 112, sr: 145.2, avg: 42.1, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" },
-  p2: { id: "p2", name: "Virat Saxena", team_id: "t1", role: "Batter", runs: 1150, wickets: 8, highest_score: 128, sr: 138.5, avg: 52.2, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" }
+  p2: { id: "p2", name: "Virat Saxena", team_id: "t1", role: "Batter", runs: 1150, wickets: 8, highest_score: 128, sr: 138.5, avg: 52.2, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" },
+  p4: { id: "p4", name: "Hardik Patel", team_id: "t1", role: "All-Rounder", runs: 620, wickets: 32, highest_score: 78, sr: 162.4, avg: 31.0, avatar: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80" },
+  p5: { id: "p5", name: "Rishabh Singh", team_id: "t1", role: "Wicket-Keeper Batter", runs: 790, wickets: 0, highest_score: 95, sr: 154.8, avg: 37.6, avatar: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80" }
 };
 
 const INITIAL_TOURNAMENTS = [
@@ -101,7 +103,7 @@ export function CricketProvider({ children }) {
   const [teams, setTeams] = useState(INITIAL_TEAMS);
   const [players, setPlayers] = useState(INITIAL_PLAYERS);
   const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
-  const [celebrationType, setCelebrationType] = useState(null); // 'four', 'six', 'wicket' or null
+  const [celebrationType, setCelebrationType] = useState(null);
 
   const [currentUser, setCurrentUser] = useState({
     id: "u1",
@@ -125,8 +127,7 @@ export function CricketProvider({ children }) {
     }).catch(() => {});
   };
 
-  const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, shot_zone = "Cover" }) => {
-    // Trigger Explosion Celebration Banner on Screen!
+  const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, out_batter = "striker", new_batter_id = "p4", shot_zone = "Cover" }) => {
     if (is_wicket) {
       setCelebrationType('wicket');
       if (soundEnabled) playMatchSound('wicket');
@@ -147,6 +148,8 @@ export function CricketProvider({ children }) {
         is_wicket,
         wicket_type,
         fielder_name,
+        out_batter,
+        new_batter_id,
         shot_zone
       });
 
@@ -156,7 +159,7 @@ export function CricketProvider({ children }) {
       }
     } catch (e) {}
 
-    // Local fallback calculation
+    // Fallback local update
     setMatch((prevMatch) => {
       const newMatch = JSON.parse(JSON.stringify(prevMatch));
       const currKey = `innings_${newMatch.current_innings}`;
@@ -187,7 +190,37 @@ export function CricketProvider({ children }) {
       }
 
       inn.overs = parseFloat(`${completedOvers}.${balls}`);
-      if (is_wicket) inn.wickets += 1;
+      if (is_wicket) {
+        inn.wickets += 1;
+        const newB = players[new_batter_id] || { name: "Hardik Patel" };
+
+        // Mark dismissed batter as out
+        const dismissedId = out_batter === 'striker' ? inn.striker_id : inn.non_striker_id;
+        const dismissedStat = inn.batting_stats.find(b => b.player_id === dismissedId);
+        if (dismissedStat) {
+          dismissedStat.out = true;
+          dismissedStat.dismissal = wicket_type === 'Run Out' ? `run out (${fielder_name || 'Rashid'})` : `b Bowler`;
+        }
+
+        // Switch to new batsman
+        if (out_batter === 'striker') {
+          inn.striker_id = new_batter_id;
+        } else {
+          inn.non_striker_id = new_batter_id;
+        }
+
+        inn.batting_stats.push({
+          player_id: new_batter_id,
+          name: newB.name,
+          runs: 0,
+          balls: 0,
+          fours: 0,
+          sixes: 0,
+          sr: 0.0,
+          out: false,
+          dismissal: "Not Out"
+        });
+      }
 
       return newMatch;
     });
