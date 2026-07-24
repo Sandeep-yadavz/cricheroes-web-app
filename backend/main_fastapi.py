@@ -6,12 +6,12 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Header, Depends, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for authentication, database connection, user profiles, tournament ownership & real-time fielding sync.",
-    version="2.0.0"
+    description="High performance Python FastAPI backend for search, database queries, authentication, tournament ownership & real-time fielding sync.",
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -63,14 +63,26 @@ INITIAL_DATA = {
         }
     ],
     "players": [
-        {"id": "p1", "name": "Rohit Varma", "runs": 842, "wickets": 4, "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"},
-        {"id": "p2", "name": "Virat Saxena", "runs": 1150, "wickets": 8, "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"}
+        {"id": "p1", "name": "Rohit Varma", "role": "Batter", "runs": 842, "wickets": 4, "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"},
+        {"id": "p2", "name": "Virat Saxena", "role": "Batter", "runs": 1150, "wickets": 8, "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"}
     ],
     "teams": [
         {"id": "t1", "name": "Mumbai Strikers", "short_name": "MUM", "logo": "🔥"},
         {"id": "t2", "name": "Delhi Dynamites", "short_name": "DEL", "logo": "⚡"}
     ],
-    "tournaments": [],
+    "tournaments": [
+        {
+            "id": "tour1",
+            "name": "Grassroots Champions Trophy 2026",
+            "admin_id": "u2",
+            "admin_name": "Amit Sharma",
+            "format": "T20",
+            "ball_type": "Leather",
+            "overs_limit": 20,
+            "location": "Central Cricket Ground, Mumbai",
+            "status": "Ongoing"
+        }
+    ],
     "matches": [
         {
             "id": "m1",
@@ -78,8 +90,10 @@ INITIAL_DATA = {
             "admin_id": "u2",
             "assigned_scorer_id": "u1",
             "assigned_scorer_name": "Rohit Varma",
-            "team_a": "t1",
-            "team_b": "t2",
+            "team_a_name": "Mumbai Strikers",
+            "team_b_name": "Delhi Dynamites",
+            "venue": "Central Cricket Ground, Churchgate",
+            "distance": "1.2 km away",
             "overs_limit": 20,
             "status": "LIVE",
             "current_innings": 1,
@@ -148,15 +162,66 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes Authentication Engine (v2.0.0)</h1>")
+    return HTMLResponse("<h1>CricHeroes Search & Database Engine (v2.1.0)</h1>")
 
-# Registration endpoint with Gmail, Phone Number, Name, Age, and Password
+# Search backend API endpoint fetching real data from database.json
+@app.get("/api/search")
+def search_database(q: str = ""):
+    data = load_db()
+    query = (q or "").lower().strip()
+
+    matches = data.get("matches", [])
+    tournaments = data.get("tournaments", [])
+    teams = data.get("teams", [])
+    players = data.get("players", [])
+
+    if not query:
+        return {
+            "matches": matches,
+            "tournaments": tournaments,
+            "teams": teams,
+            "players": players
+        }
+
+    res_matches = [
+        m for m in matches
+        if query in (m.get("tournament_name") or "").lower()
+        or query in (m.get("team_a_name") or "").lower()
+        or query in (m.get("team_b_name") or "").lower()
+        or query in (m.get("venue") or "").lower()
+    ]
+
+    res_tournaments = [
+        t for t in tournaments
+        if query in (t.get("name") or "").lower()
+        or query in (t.get("location") or "").lower()
+        or query in (t.get("format") or "").lower()
+    ]
+
+    res_teams = [
+        tm for tm in teams
+        if query in (tm.get("name") or "").lower()
+        or query in (tm.get("short_name") or "").lower()
+    ]
+
+    res_players = [
+        p for p in players
+        if query in (p.get("name") or "").lower()
+        or query in (p.get("role") or "").lower()
+    ]
+
+    return {
+        "matches": res_matches,
+        "tournaments": res_tournaments,
+        "teams": res_teams,
+        "players": res_players
+    }
+
 @app.post("/api/auth/register")
 def register_user(user_in: UserRegisterInput):
     data = load_db()
     users = data.get("users", [])
     
-    # Check if email already registered
     existing_user = next((u for u in users if u["email"].lower() == user_in.email.lower()), None)
     if existing_user:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -184,7 +249,6 @@ def register_user(user_in: UserRegisterInput):
     }
     return {"status": "success", "user": user_profile, "token": new_user["token"]}
 
-# Login endpoint
 @app.post("/api/auth/login")
 def login_user(login_in: UserLoginInput):
     data = load_db()
@@ -193,7 +257,6 @@ def login_user(login_in: UserLoginInput):
 
     user = next((u for u in users if (u["email"].lower() == login_in.email.lower() or u.get("phone_number") == login_in.email) and u["password_hash"] == pwd_hash), None)
     if not user:
-        # Fallback check for demo ease
         user = next((u for u in users if u["email"].lower() == login_in.email.lower()), None)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid email or password")

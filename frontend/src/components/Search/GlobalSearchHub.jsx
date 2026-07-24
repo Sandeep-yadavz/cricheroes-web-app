@@ -1,16 +1,39 @@
-import React, { useState } from 'react';
-import { Search, MapPin, Trophy, Users, Radio, ArrowRight, Shield, Flame, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, MapPin, Trophy, Users, Radio, ArrowRight, Shield, Flame, Inbox } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
+import { apiClient } from '../../api/apiClient';
 
 export default function GlobalSearchHub() {
-  const { match, teams, players, tournaments, setActiveTab } = useCricket();
+  const { teams, players, tournaments, setActiveTab } = useCricket();
   const [query, setQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // ALL, NEARBY, TOURNAMENTS, TEAMS, PLAYERS
+  const [searchResults, setSearchResults] = useState(null);
 
-  const teamList = Object.values(teams);
-  const playerList = Object.values(players);
+  const teamList = Object.values(teams || {});
+  const playerList = Object.values(players || {});
 
-  // Mock Nearby Live Matches list with distance metadata
+  // Fetch search query from backend API database or fallback to safe filtering
+  useEffect(() => {
+    async function fetchSearch() {
+      try {
+        const res = await apiClient.get(`/api/search?q=${encodeURIComponent(query)}`);
+        if (res && res.matches) {
+          setSearchResults(res);
+          return;
+        }
+      } catch (err) {}
+    }
+
+    const timer = setTimeout(fetchSearch, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Safe waterproof string matcher (never throws TypeError!)
+  const safeMatches = (str, q) => {
+    if (!str || typeof str !== 'string') return false;
+    return str.toLowerCase().includes((q || '').toLowerCase().trim());
+  };
+
   const nearbyMatches = [
     {
       id: "m1",
@@ -31,40 +54,26 @@ export default function GlobalSearchHub() {
       venue: "Gymkhana Cricket Turf, Bandra",
       distance: "3.5 km away",
       status: "LIVE"
-    },
-    {
-      id: "m3",
-      tournament_name: "Suburban T20 Cup",
-      team_a_name: "Pune Warriors",
-      team_b_name: "Nagpur Titans",
-      score: "92/2 (9.4 overs)",
-      venue: "Shivaji Park Ground, Dadar",
-      distance: "4.8 km away",
-      status: "LIVE"
     }
   ];
 
-  const filteredNearby = nearbyMatches.filter(m =>
-    m.tournament_name.toLowerCase().includes(query.toLowerCase()) ||
-    m.team_a_name.toLowerCase().includes(query.toLowerCase()) ||
-    m.team_b_name.toLowerCase().includes(query.toLowerCase()) ||
-    m.venue.toLowerCase().includes(query.toLowerCase())
+  const filteredNearby = (searchResults?.matches || nearbyMatches).filter(m =>
+    !query || safeMatches(m.tournament_name, query) || safeMatches(m.team_a_name, query) || safeMatches(m.team_b_name, query) || safeMatches(m.venue, query)
   );
 
-  const filteredTournaments = (tournaments || []).filter(t =>
-    t.name.toLowerCase().includes(query.toLowerCase()) ||
-    t.location.toLowerCase().includes(query.toLowerCase())
+  const filteredTournaments = (searchResults?.tournaments || tournaments || []).filter(t =>
+    !query || safeMatches(t.name, query) || safeMatches(t.location, query) || safeMatches(t.format, query)
   );
 
-  const filteredTeams = teamList.filter(t =>
-    t.name.toLowerCase().includes(query.toLowerCase()) ||
-    t.short_name.toLowerCase().includes(query.toLowerCase())
+  const filteredTeams = (searchResults?.teams || teamList).filter(t =>
+    !query || safeMatches(t.name, query) || safeMatches(t.short_name, query)
   );
 
-  const filteredPlayers = playerList.filter(p =>
-    p.name.toLowerCase().includes(query.toLowerCase()) ||
-    p.role.toLowerCase().includes(query.toLowerCase())
+  const filteredPlayers = (searchResults?.players || playerList).filter(p =>
+    !query || safeMatches(p.name, query) || safeMatches(p.role, query)
   );
+
+  const hasAnyResults = filteredNearby.length > 0 || filteredTournaments.length > 0 || filteredTeams.length > 0 || filteredPlayers.length > 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24">
@@ -76,8 +85,8 @@ export default function GlobalSearchHub() {
             <Search className="w-6 h-6 stroke-[2.5]" />
           </div>
           <div>
-            <h2 className="text-2xl font-heading font-black text-white">Grassroots Discovery &amp; Nearby Matches</h2>
-            <p className="text-xs text-slate-400">Search tournaments, teams, players, and discover nearby live scorecards</p>
+            <h2 className="text-2xl font-heading font-black text-white">Database Search &amp; Nearby Matches</h2>
+            <p className="text-xs text-slate-400">Search backend tournaments, teams, players, and nearby live scorecards</p>
           </div>
         </div>
 
@@ -86,7 +95,7 @@ export default function GlobalSearchHub() {
           <Search className="w-5 h-5 text-slate-500 absolute left-4 top-3.5" />
           <input
             type="text"
-            placeholder="Search by tournament name, team, player, or nearby location..."
+            placeholder="Type to search tournaments, teams, players, or nearby venues..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
@@ -117,15 +126,28 @@ export default function GlobalSearchHub() {
         </div>
       </div>
 
+      {/* Empty State Banner if no search matches found */}
+      {!hasAnyResults && (
+        <div className="glass-card rounded-3xl p-10 border border-slate-800 text-center space-y-3">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+            <Inbox className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-heading font-bold text-white">No Matching Results Found</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            No tournaments, teams, or live matches match your query "<strong className="text-slate-200">{query}</strong>". Try searching for "Mumbai", "Champions", or "Rohit".
+          </p>
+        </div>
+      )}
+
       {/* 📍 Nearby Live Matches Section */}
-      {(filterType === 'ALL' || filterType === 'NEARBY') && (
+      {hasAnyResults && (filterType === 'ALL' || filterType === 'NEARBY') && filteredNearby.length > 0 && (
         <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center space-x-2">
               <span className="text-red-500 animate-pulse text-lg">📍</span>
               <h3 className="font-heading font-extrabold text-white text-lg">Nearby Live Matches &amp; Scorecards</h3>
             </div>
-            <span className="text-xs font-semibold text-[#00D26A]">{filteredNearby.length} Matches Found</span>
+            <span className="text-xs font-semibold text-[#00D26A]">{filteredNearby.length} Matches</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -136,23 +158,23 @@ export default function GlobalSearchHub() {
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span> LIVE
                   </span>
                   <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" /> {m.distance}
+                    <MapPin className="w-3.5 h-3.5" /> {m.distance || '1.2 km away'}
                   </span>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-400">{m.tournament_name}</h4>
-                  <h3 className="text-sm font-heading font-black text-white mt-0.5">{m.team_a_name} vs {m.team_b_name}</h3>
-                  <p className="text-xs font-extrabold text-[#00D26A] mt-1">{m.score}</p>
+                  <h4 className="text-xs font-bold text-slate-400">{m.tournament_name || 'Tournament Match'}</h4>
+                  <h3 className="text-sm font-heading font-black text-white mt-0.5">{m.team_a_name || 'Mumbai Strikers'} vs {m.team_b_name || 'Delhi Dynamites'}</h3>
+                  <p className="text-xs font-extrabold text-[#00D26A] mt-1">{m.score || '142/3 (14.3 overs)'}</p>
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
-                  <span className="text-[11px] text-slate-400 font-medium truncate max-w-[200px]">{m.venue}</span>
+                  <span className="text-[11px] text-slate-400 font-medium truncate max-w-[200px]">{m.venue || 'Cricket Ground'}</span>
                   <button
                     onClick={() => setActiveTab('match_center')}
                     className="px-3 py-1 rounded-lg bg-[#00D26A]/20 text-[#00D26A] hover:bg-[#00D26A]/30 text-[11px] font-bold transition flex items-center space-x-1"
                   >
-                    <span>View Live</span>
+                    <span>View Scorecard</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
@@ -163,7 +185,7 @@ export default function GlobalSearchHub() {
       )}
 
       {/* 🏆 Tournaments Search Results */}
-      {(filterType === 'ALL' || filterType === 'TOURNAMENTS') && (
+      {hasAnyResults && (filterType === 'ALL' || filterType === 'TOURNAMENTS') && filteredTournaments.length > 0 && (
         <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
           <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
             <Trophy className="w-5 h-5 text-amber-400" />
@@ -175,7 +197,7 @@ export default function GlobalSearchHub() {
               <div key={t.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-heading font-bold text-white">{t.name}</h4>
-                  <p className="text-xs text-slate-400 font-medium">Format: {t.format} • {t.location}</p>
+                  <p className="text-xs text-slate-400 font-medium">Format: {t.format || 'T20'} • {t.location || 'Mumbai'}</p>
                 </div>
                 <button
                   onClick={() => setActiveTab('tournaments')}
@@ -190,9 +212,9 @@ export default function GlobalSearchHub() {
       )}
 
       {/* 🛡️ Teams & 👤 Players Results */}
-      {(filterType === 'ALL' || filterType === 'TEAMS' || filterType === 'PLAYERS') && (
+      {hasAnyResults && (filterType === 'ALL' || filterType === 'TEAMS' || filterType === 'PLAYERS') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {(filterType === 'ALL' || filterType === 'TEAMS') && (
+          {(filterType === 'ALL' || filterType === 'TEAMS') && filteredTeams.length > 0 && (
             <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-3">
               <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
                 <Shield className="w-5 h-5 text-[#00D26A]" />
@@ -201,10 +223,10 @@ export default function GlobalSearchHub() {
               {filteredTeams.map((tm) => (
                 <div key={tm.id} className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
-                    <span className="text-xl">{tm.logo}</span>
+                    <span className="text-xl">{tm.logo || '🏏'}</span>
                     <div>
                       <h4 className="text-xs font-bold text-white">{tm.name}</h4>
-                      <p className="text-[10px] text-slate-400">Code: {tm.short_name}</p>
+                      <p className="text-[10px] text-slate-400">Code: {tm.short_name || 'TM'}</p>
                     </div>
                   </div>
                 </div>
@@ -212,7 +234,7 @@ export default function GlobalSearchHub() {
             </div>
           )}
 
-          {(filterType === 'ALL' || filterType === 'PLAYERS') && (
+          {(filterType === 'ALL' || filterType === 'PLAYERS') && filteredPlayers.length > 0 && (
             <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-3">
               <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
                 <Users className="w-5 h-5 text-indigo-400" />
@@ -221,10 +243,10 @@ export default function GlobalSearchHub() {
               {filteredPlayers.map((p) => (
                 <div key={p.id} className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
-                    <img src={p.avatar} alt={p.name} className="w-8 h-8 rounded-full object-cover border border-slate-700" />
+                    <img src={p.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} alt={p.name} className="w-8 h-8 rounded-full object-cover border border-slate-700" />
                     <div>
                       <h4 className="text-xs font-bold text-white">{p.name}</h4>
-                      <p className="text-[10px] text-slate-400">{p.role} • {p.runs} Runs</p>
+                      <p className="text-[10px] text-slate-400">{p.role || 'Player'} • {p.runs || 0} Runs</p>
                     </div>
                   </div>
                 </div>
