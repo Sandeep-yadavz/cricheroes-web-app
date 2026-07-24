@@ -24,8 +24,8 @@ export default function WicketModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-md bg-[#121824] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="w-full max-w-md bg-[#121824] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6 relative z-[10000]">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -47,7 +47,6 @@ export default function WicketModal() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Dismissal Mode Grid */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-2 uppercase">Dismissal Type</label>
             <div className="grid grid-cols-3 gap-2">
@@ -68,7 +67,6 @@ export default function WicketModal() {
             </div>
           </div>
 
-          {/* Fielder Input if Caught / Run Out / Stumped */}
           {(wicketType === 'Caught' || wicketType === 'Run Out' || wicketType === 'Stumped') && (
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase">
@@ -84,7 +82,6 @@ export default function WicketModal() {
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex items-center space-x-3 pt-2">
             <button
               type="button"
