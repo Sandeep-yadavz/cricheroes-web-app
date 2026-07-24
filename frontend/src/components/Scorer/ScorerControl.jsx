@@ -4,13 +4,14 @@ import { useCricket } from '../../context/CricketContext';
 import WicketModal from './WicketModal';
 import MatchWinnerModal from './MatchWinnerModal';
 import DraggableFieldingWagonWheel from './DraggableFieldingWagonWheel';
+import MiniWagonWheelSelector from './MiniWagonWheelSelector';
 import AssignScorerModal from '../Tournaments/AssignScorerModal';
 
 export default function ScorerControl() {
   const { match, teams, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser } = useCricket();
   const [selectedShotZone, setSelectedShotZone] = useState('Cover');
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [activeExtraType, setActiveExtraType] = useState(null); // 'wide', 'noball', 'bye', 'legbye' or null
+  const [activeExtraType, setActiveExtraType] = useState(null);
 
   const currKey = `innings_${match.current_innings || 1}`;
   const inn = match[currKey] || match.innings_1 || { runs: 0, wickets: 0, overs: 0.0 };
@@ -33,8 +34,6 @@ export default function ScorerControl() {
   };
 
   const crr = inn.overs > 0 ? (inn.runs / (Math.floor(inn.overs) + (inn.overs % 1) * (10 / 6))).toFixed(2) : "0.00";
-
-  // Calculate current over balls sequence for "THIS OVER" bar
   const currentOverBalls = (match.ball_history || []).slice(0, 8);
 
   return (
@@ -165,12 +164,18 @@ export default function ScorerControl() {
         </div>
       </div>
 
-      {/* Touch Run Scoring Keypad */}
+      {/* Touch Run Scoring Keypad & Mini Shot Location Selector */}
       <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-5 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="font-heading font-extrabold text-white text-base">Touch Score Keypad</h3>
           <span className="text-xs font-bold text-[#00D26A]">Tap runs or extras to score</span>
         </div>
+
+        {/* Mini Shot Location Selector */}
+        <MiniWagonWheelSelector
+          selectedZone={selectedShotZone}
+          onSelectZone={(zone) => setSelectedShotZone(zone)}
+        />
 
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
           <button onClick={() => onScore(0)} className="py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-heading font-black text-xl border border-slate-800 shadow-md active:scale-95 transition">0</button>
@@ -182,7 +187,7 @@ export default function ScorerControl() {
           <button onClick={() => setIsWicketModalOpen(true)} className="py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-heading font-black text-lg col-span-2 sm:col-span-1 shadow-lg shadow-red-600/30 active:scale-95 transition">WKT</button>
         </div>
 
-        {/* Extras Row (Wide, No Ball, Bye, Leg Bye Selector) */}
+        {/* Extras Row */}
         <div className="space-y-3 pt-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button

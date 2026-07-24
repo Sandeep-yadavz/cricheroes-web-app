@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring, runouts, new batsman switching, commentary & fielding sync.",
-    version="2.4.0"
+    description="High performance Python FastAPI backend for scoring, rich cricket commentary generation, runouts, new batsman switching & fielding sync.",
+    version="2.5.0"
 )
 
 app.add_middleware(
@@ -51,7 +51,7 @@ INITIAL_BALL_HISTORY = [
     "striker_name": "Rohit Varma",
     "bowler_name": "Rashid Khan",
     "shot_zone": "Cover",
-    "description": "14.3 Rashid Khan to Rohit Varma, FOUR RUNS! Smashed gracefully through cover for a boundary!"
+    "description": "14.3 Rashid Khan to Rohit Varma, FOUR RUNS! Driven gracefully through Cover for a boundary!"
   }
 ]
 
@@ -80,7 +80,8 @@ INITIAL_DATA = {
         {"id": "p1", "name": "Rohit Varma", "role": "Batter", "runs": 842, "wickets": 4, "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"},
         {"id": "p2", "name": "Virat Saxena", "role": "Batter", "runs": 1150, "wickets": 8, "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"},
         {"id": "p4", "name": "Hardik Patel", "role": "All-Rounder", "runs": 620, "wickets": 32, "avatar": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80"},
-        {"id": "p5", "name": "Rishabh Singh", "role": "Wicket-Keeper Batter", "runs": 790, "wickets": 0, "avatar": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80"}
+        {"id": "p5", "name": "Rishabh Singh", "role": "Wicket-Keeper Batter", "runs": 790, "wickets": 0, "avatar": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80"},
+        {"id": "p8", "name": "Rashid Khan", "role": "Bowler", "runs": 310, "wickets": 52, "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80"}
     ],
     "teams": [
         {"id": "t1", "name": "Mumbai Strikers", "short_name": "MUM", "logo": "🔥"},
@@ -171,7 +172,7 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes Wicket & Batter Switch Engine (v2.4.0)</h1>")
+    return HTMLResponse("<h1>CricHeroes Dynamic Commentary Engine (v2.5.0)</h1>")
 
 @app.get("/api/matches/{match_id}")
 def get_match_detail(match_id: str):
@@ -203,6 +204,15 @@ def score_ball(match_id: str, ball_data: BallInput):
     new_batter_id = ball_data.new_batter_id or "p4"
     shot_zone = ball_data.shot_zone or "Cover"
 
+    player_dict = {p["id"]: p for p in data.get("players", [])}
+
+    # Striker & Bowler Objects
+    striker_id = inn.get("striker_id", "p1")
+    striker_obj = player_dict.get(striker_id, {"name": "Rohit Varma"})
+
+    bowler_id = inn.get("current_bowler_id", "p8")
+    bowler_obj = player_dict.get(bowler_id, {"name": "Rashid Khan"})
+
     added_runs = runs_off_bat
     is_legal = True
 
@@ -232,8 +242,6 @@ def score_ball(match_id: str, ball_data: BallInput):
     over_str = f"{completed_overs}.{balls}"
     inn["overs"] = float(over_str)
 
-    # Lookup player dictionary for names
-    player_dict = {p["id"]: p for p in data.get("players", [])}
     new_batter_obj = player_dict.get(new_batter_id, {"name": "Hardik Patel"})
 
     # Process Wicket & New Batsman Entrance
@@ -242,27 +250,25 @@ def score_ball(match_id: str, ball_data: BallInput):
         dismissed_id = inn.get("striker_id") if out_batter_type == "striker" else inn.get("non_striker_id")
         dismissed_stat = next((b for b in inn["batting_stats"] if b["player_id"] == dismissed_id), None)
 
-        dismissal_text = f"b Bowler"
+        dismissal_text = f"b {bowler_obj['name']}"
         if wicket_type == 'Run Out':
             dismissal_text = f"run out ({fielder_name})"
         elif wicket_type == 'Caught':
-            dismissal_text = f"c {fielder_name} b Bowler"
+            dismissal_text = f"c {fielder_name} b {bowler_obj['name']}"
         elif wicket_type == 'LBW':
-            dismissal_text = "lbw b Bowler"
+            dismissal_text = f"lbw b {bowler_obj['name']}"
         elif wicket_type == 'Stumped':
-            dismissal_text = f"st {fielder_name} b Bowler"
+            dismissal_text = f"st {fielder_name} b {bowler_obj['name']}"
 
         if dismissed_stat:
             dismissed_stat["out"] = True
             dismissed_stat["dismissal"] = dismissal_text
 
-        # Switch incoming new batsman to replace dismissed player!
         if out_batter_type == "striker":
             inn["striker_id"] = new_batter_id
         else:
             inn["non_striker_id"] = new_batter_id
 
-        # Add new batsman to batting_stats
         inn["batting_stats"].append({
             "player_id": new_batter_id,
             "name": new_batter_obj["name"],
@@ -276,10 +282,9 @@ def score_ball(match_id: str, ball_data: BallInput):
         })
 
     # Striker & Non-Striker Stats Update
-    striker_id = inn.get("striker_id", "p1")
     striker = next((b for b in inn["batting_stats"] if b["player_id"] == striker_id), None)
     if not striker:
-        striker = {"player_id": striker_id, "name": "Rohit Varma", "runs": 0, "balls": 0, "fours": 0, "sixes": 0, "sr": 0.0, "out": False, "dismissal": "Not Out"}
+        striker = {"player_id": striker_id, "name": striker_obj["name"], "runs": 0, "balls": 0, "fours": 0, "sixes": 0, "sr": 0.0, "out": False, "dismissal": "Not Out"}
         inn["batting_stats"].append(striker)
 
     if not is_wicket and extra_type != 'wide' and extra_type not in ['bye', 'legbye']:
@@ -296,20 +301,32 @@ def score_ball(match_id: str, ball_data: BallInput):
     if not is_wicket and (runs_off_bat % 2 == 1 or added_runs % 2 == 1) and is_legal:
         inn["striker_id"], inn["non_striker_id"] = inn.get("non_striker_id"), inn.get("striker_id")
 
-    # Generate Dynamic Commentary Text
+    # Generate Detailed Natural Cricket Commentary
+    b_name = bowler_obj.get("name", "Rashid Khan")
+    s_name = striker_obj.get("name", "Rohit Varma")
+
     desc_text = ""
     if is_wicket:
-        desc_text = f"{over_str} Rashid Khan to {striker['name']}, OUT ({wicket_type})! New batter {new_batter_obj['name']} comes out to bat!"
+        desc_text = f"{over_str} {b_name} to {s_name}, OUT ({wicket_type})! Big wicket falls towards {shot_zone}! New batter {new_batter_obj['name']} comes in!"
     elif extra_type == 'noball':
-        desc_text = f"{over_str} Rashid Khan to {striker['name']}, NO BALL + {runs_off_bat} RUNS! Smashed towards {shot_zone}! Free Hit coming up!"
+        if runs_off_bat > 0:
+            desc_text = f"{over_str} {b_name} to {s_name}, NO BALL + {runs_off_bat} RUNS! Smashed firmly towards {shot_zone}! Free Hit coming up!"
+        else:
+            desc_text = f"{over_str} {b_name} to {s_name}, NO BALL! Front foot overstep towards {shot_zone}. Free Hit next!"
     elif extra_type == 'wide':
-        desc_text = f"{over_str} Rashid Khan to {striker['name']}, WIDE! Way outside line."
+        desc_text = f"{over_str} {b_name} to {s_name}, WIDE + {runs_off_bat} RUN(S)! Way outside line past {shot_zone}."
+    elif extra_type == 'bye':
+        desc_text = f"{over_str} {b_name} to {s_name}, {runs_off_bat} BYE(S)! Beats keeper and sneaks towards {shot_zone}."
+    elif extra_type == 'legbye':
+        desc_text = f"{over_str} {b_name} to {s_name}, {runs_off_bat} LEG BYE(S)! Off pads towards {shot_zone}."
     elif runs_off_bat == 6:
-        desc_text = f"{over_str} Rashid Khan to {striker['name']}, SIX RUNS! Maximum hit!"
+        desc_text = f"{over_str} {b_name} to {s_name}, SIX RUNS! Massive hit high into the stands at {shot_zone}!"
     elif runs_off_bat == 4:
-        desc_text = f"{over_str} Rashid Khan to {striker['name']}, FOUR RUNS! Boundary!"
+        desc_text = f"{over_str} {b_name} to {s_name}, FOUR RUNS! Beautifully driven along the ground to {shot_zone}!"
+    elif runs_off_bat == 0:
+        desc_text = f"{over_str} {b_name} to {s_name}, Dot ball. Defended back towards {shot_zone}."
     else:
-        desc_text = f"{over_str} Rashid Khan to {striker['name']}, {runs_off_bat} run(s)."
+        desc_text = f"{over_str} {b_name} to {s_name}, {runs_off_bat} run(s) placed into the gap at {shot_zone}."
 
     new_ball = {
         "id": f"b_{secrets.token_hex(4)}",
@@ -317,8 +334,8 @@ def score_ball(match_id: str, ball_data: BallInput):
         "runs": added_runs,
         "extra_type": extra_type,
         "is_wicket": is_wicket,
-        "striker_name": striker['name'],
-        "bowler_name": "Rashid Khan",
+        "striker_name": s_name,
+        "bowler_name": b_name,
         "shot_zone": shot_zone,
         "description": desc_text
     }
