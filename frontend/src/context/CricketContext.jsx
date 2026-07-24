@@ -95,7 +95,10 @@ const INITIAL_MATCH = {
     striker_id: "p5",
     non_striker_id: "p7",
     current_bowler_id: "p3",
-    batting_stats: [],
+    batting_stats: [
+      { player_id: "p5", name: "Rishabh Singh", runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0.0, out: false, dismissal: "Not Out" },
+      { player_id: "p7", name: "KL Rahul", runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0.0, out: false, dismissal: "Not Out" }
+    ],
     bowling_stats: []
   },
   ball_history: [],
@@ -177,6 +180,7 @@ export function CricketProvider({ children }) {
       }
     } catch (e) {}
 
+    // Fallback local update if backend offline
     setMatch((prevMatch) => {
       const newMatch = JSON.parse(JSON.stringify(prevMatch));
       const currKey = `innings_${newMatch.current_innings}`;
@@ -208,6 +212,28 @@ export function CricketProvider({ children }) {
 
       inn.overs = parseFloat(`${completedOvers}.${balls}`);
       if (is_wicket) inn.wickets += 1;
+
+      // Update Striker Batter
+      let striker = inn.batting_stats.find(b => b.player_id === inn.striker_id);
+      if (!striker) {
+        striker = { player_id: inn.striker_id, name: "Rohit Varma", runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0, out: false, dismissal: "Not Out" };
+        inn.batting_stats.push(striker);
+      }
+
+      if (isLegal && extra_type !== 'bye' && extra_type !== 'legbye') {
+        striker.runs += runs;
+        striker.balls += 1;
+        if (runs === 4) striker.fours += 1;
+        if (runs === 6) striker.sixes += 1;
+        striker.sr = parseFloat(((striker.runs / Math.max(1, striker.balls)) * 100).toFixed(1));
+      }
+
+      // Ensure Non-Striker is present
+      let nonStriker = inn.batting_stats.find(b => b.player_id === inn.non_striker_id);
+      if (!nonStriker) {
+        nonStriker = { player_id: inn.non_striker_id, name: "Virat Saxena", runs: 45, balls: 31, fours: 5, sixes: 1, sr: 145.2, out: false, dismissal: "Not Out" };
+        inn.batting_stats.push(nonStriker);
+      }
 
       return newMatch;
     });

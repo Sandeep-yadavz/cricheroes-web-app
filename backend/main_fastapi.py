@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for search, database queries, authentication, tournament ownership & real-time fielding sync.",
-    version="2.1.0"
+    description="High performance Python FastAPI backend for scoring calculation, database updates, search & fielding sync.",
+    version="2.2.0"
 )
 
 app.add_middleware(
@@ -109,7 +109,8 @@ INITIAL_DATA = {
                 "non_striker_id": "p2",
                 "current_bowler_id": "p8",
                 "batting_stats": [
-                    {"player_id": "p1", "name": "Rohit Varma", "runs": 68, "balls": 42, "fours": 7, "sixes": 3, "sr": 161.9, "out": False, "dismissal": "Not Out"}
+                    {"player_id": "p1", "name": "Rohit Varma", "runs": 68, "balls": 42, "fours": 7, "sixes": 3, "sr": 161.9, "out": False, "dismissal": "Not Out"},
+                    {"player_id": "p2", "name": "Virat Saxena", "runs": 45, "balls": 31, "fours": 5, "sixes": 1, "sr": 145.2, "out": False, "dismissal": "Not Out"}
                 ],
                 "bowling_stats": [
                     {"player_id": "p8", "name": "Rashid Khan", "overs": 3.3, "maidens": 0, "runs": 28, "wickets": 2, "economy": 8.0}
@@ -162,9 +163,8 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes Search & Database Engine (v2.1.0)</h1>")
+    return HTMLResponse("<h1>CricHeroes Scoring & Database Engine (v2.2.0)</h1>")
 
-# Search backend API endpoint fetching real data from database.json
 @app.get("/api/search")
 def search_database(q: str = ""):
     data = load_db()
@@ -298,15 +298,20 @@ def get_match_detail(match_id: str):
             "innings_1": {
                 "batting_team_id": "t1",
                 "bowling_team_id": "t2",
-                "runs": 0,
-                "wickets": 0,
-                "overs": 0.0,
-                "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
+                "runs": 142,
+                "wickets": 3,
+                "overs": 14.3,
+                "extras": {"wides": 6, "noballs": 2, "byes": 1, "legbyes": 3},
                 "striker_id": "p1",
                 "non_striker_id": "p2",
                 "current_bowler_id": "p8",
-                "batting_stats": [],
-                "bowling_stats": []
+                "batting_stats": [
+                    {"player_id": "p1", "name": "Rohit Varma", "runs": 68, "balls": 42, "fours": 7, "sixes": 3, "sr": 161.9, "out": False, "dismissal": "Not Out"},
+                    {"player_id": "p2", "name": "Virat Saxena", "runs": 45, "balls": 31, "fours": 5, "sixes": 1, "sr": 145.2, "out": False, "dismissal": "Not Out"}
+                ],
+                "bowling_stats": [
+                    {"player_id": "p8", "name": "Rashid Khan", "overs": 3.3, "maidens": 0, "runs": 28, "wickets": 2, "economy": 8.0}
+                ]
             },
             "ball_history": [],
             "wagon_wheel": []
@@ -330,8 +335,82 @@ def update_fielding(match_id: str, field_input: FieldingPositionsInput):
     save_db(data)
     return {"status": "success", "match": match}
 
+# Full calculation logic for scoring a ball in Python FastAPI backend
 @app.post("/api/matches/{match_id}/score-ball")
 def score_ball(match_id: str, ball_data: BallInput):
+    data = load_db()
+    match = next((m for m in data["matches"] if m["id"] == match_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    curr_key = f"innings_{match.get('current_innings', 1)}"
+    inn = match.get(curr_key)
+    if not inn:
+        inn = match.get("innings_1")
+
+    runs = ball_data.runs
+    extra_type = ball_data.extra_type
+    is_wicket = ball_data.is_wicket
+
+    added_runs = runs
+    is_legal = True
+
+    if extra_type in ['wide', 'noball']:
+        is_legal = False
+        added_runs += 1
+        inn["extras"][f"{extra_type}s"] += 1
+    elif extra_type in ['bye', 'legbye']:
+        inn["extras"][f"{extra_type}s"] += runs
+
+    inn["runs"] += added_runs
+
+    # Update Overs & Balls
+    completed_overs = int(inn["overs"])
+    balls = int(round((inn["overs"] - completed_overs) * 10))
+
+    if is_legal:
+        balls += 1
+        if balls == 6:
+            completed_overs += 1
+            balls = 0
+
+    inn["overs"] = float(f"{completed_overs}.{balls}")
+
+    if is_wicket:
+        inn["wickets"] += 1
+
+    # Update Striker Batter Stats
+    striker_id = inn.get("striker_id", "p1")
+    striker = next((b for b in inn["batting_stats"] if b["player_id"] == striker_id), None)
+    if not striker:
+        striker = {"player_id": striker_id, "name": "Rohit Varma", "runs": 0, "balls": 0, "fours": 0, "sixes": 0, "sr": 0.0, "out": False, "dismissal": "Not Out"}
+        inn["batting_stats"].append(striker)
+
+    if is_legal and extra_type not in ['bye', 'legbye']:
+        striker["runs"] += runs
+        striker["balls"] += 1
+        if runs == 4:
+            striker["fours"] += 1
+        elif runs == 6:
+            striker["sixes"] += 1
+        striker["sr"] = round((striker["runs"] / max(1, striker["balls"])) * 100, 1)
+
+    # Ensure Non-Striker is present in batting_stats
+    non_striker_id = inn.get("non_striker_id", "p2")
+    non_striker = next((b for b in inn["batting_stats"] if b["player_id"] == non_striker_id), None)
+    if not non_striker:
+        non_striker = {"player_id": non_striker_id, "name": "Virat Saxena", "runs": 45, "balls": 31, "fours": 5, "sixes": 1, "sr": 145.2, "out": False, "dismissal": "Not Out"}
+        inn["batting_stats"].append(non_striker)
+
+    # Rotate Strike on odd runs
+    if runs in [1, 3, 5] and is_legal:
+        inn["striker_id"], inn["non_striker_id"] = non_striker_id, striker_id
+
+    save_db(data)
+    return {"status": "success", "match": match}
+
+@app.post("/api/matches/{match_id}/undo-ball")
+def undo_ball(match_id: str):
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
