@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, LogOut, Lock, Sparkles } from 'lucide-react';
+import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, LogOut, Lock, Sparkles, Search } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import CreateTournamentModal from '../Tournaments/CreateTournamentModal';
 import AuthModal from '../Auth/AuthModal';
 
 export default function Navbar() {
-  const { activeTab, setActiveTab, soundEnabled, setSoundEnabled, match, teams, currentUser, handleLogout } = useCricket();
+  const { activeTab, setActiveTab, soundEnabled, setSoundEnabled, match, currentUser, handleLogout } = useCricket();
   const [isCreateTourOpen, setIsCreateTourOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
@@ -46,6 +46,19 @@ export default function Navbar() {
             >
               <Radio className="w-4 h-4" />
               <span>Match Center</span>
+            </button>
+
+            {/* Global Search & Nearby Discovery Tab */}
+            <button
+              onClick={() => setActiveTab('search')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                activeTab === 'search'
+                  ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              <span>Search &amp; Nearby</span>
             </button>
 
             {/* Scorer Deck: ONLY visible if logged in user is Assigned Scorer or Tournament Admin */}
@@ -98,18 +111,6 @@ export default function Navbar() {
               <Users className="w-4 h-4" />
               <span>Players &amp; Stats</span>
             </button>
-
-            <button
-              onClick={() => setActiveTab('nrr')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'nrr'
-                  ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Calculator className="w-4 h-4" />
-              <span>NRR Calc</span>
-            </button>
           </nav>
 
           {/* Controls: Auth User, New Tournament, Sound */}
@@ -138,7 +139,6 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* Replaced "+ New Match" with "+ New Tournament" */}
             <button
               onClick={() => setIsCreateTourOpen(true)}
               className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs transition shadow-md shadow-amber-400/20"

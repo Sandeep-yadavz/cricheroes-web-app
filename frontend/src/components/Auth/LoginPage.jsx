@@ -20,25 +20,34 @@ export default function LoginPage() {
 
     try {
       if (isRegisterMode) {
-        if (!email.toLowerCase().includes('@gmail.com') && !email.toLowerCase().includes('@')) {
-          throw new Error("Please enter a valid Gmail address (e.g. user@gmail.com)");
+        // Strict Gmail Address Validation
+        const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+        if (!gmailRegex.test(email.trim())) {
+          throw new Error("Invalid Gmail Address! Email must be a valid @gmail.com address (e.g. user@gmail.com)");
         }
-        if (phoneNumber.length < 10) {
-          throw new Error("Please enter a valid 10-digit mobile phone number");
+
+        // Strict 10-Digit Mobile Phone Number Validation
+        const phoneClean = phoneNumber.replace(/\D/g, '');
+        const phoneRegex = /^[6-9]\d{9}$/;
+        if (!phoneRegex.test(phoneClean)) {
+          throw new Error("Invalid Mobile Number! Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.");
         }
-        if (parseInt(age) < 10 || parseInt(age) > 90) {
-          throw new Error("Please enter a valid age between 10 and 90");
+
+        // Age Validation
+        const parsedAge = parseInt(age);
+        if (isNaN(parsedAge) || parsedAge < 10 || parsedAge > 90) {
+          throw new Error("Invalid Age! Please enter a valid age between 10 and 90 years.");
         }
 
         await handleRegister({
-          name,
-          email,
-          phone_number: phoneNumber,
-          age: parseInt(age),
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone_number: phoneClean,
+          age: parsedAge,
           password
         });
       } else {
-        await handleLogin(email, password);
+        await handleLogin(email.trim(), password);
       }
       setActiveTab('match_center');
     } catch (err) {
@@ -75,21 +84,21 @@ export default function LoginPage() {
           <div>
             <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider block">AUTHENTICATED MEMBER</span>
             <h2 className="text-2xl font-heading font-black text-white mt-1">{currentUser.name}</h2>
-            <p className="text-xs text-slate-400 mt-1">{currentUser.email} • {currentUser.phone_number || "+91 9876543210"} • Age: {currentUser.age || 26}</p>
+            <p className="text-xs text-slate-400 mt-1">{currentUser.email} • {currentUser.phone_number || "9876543210"} • Age: {currentUser.age || 26}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-xs">
             <p className="text-slate-400 font-semibold">
-              Create a tournament to become its <strong>Organizer</strong>, or get appointed as <strong>Official Match Scorer</strong>!
+              Search nearby live matches, tournaments, teams &amp; players on the discovery hub!
             </p>
           </div>
 
           <div className="flex items-center space-x-3 pt-2">
             <button
-              onClick={() => setActiveTab('match_center')}
+              onClick={() => setActiveTab('search')}
               className="flex-1 py-3.5 rounded-xl bg-[#00D26A] text-black font-extrabold text-xs shadow-lg shadow-[#00D26A]/20 hover:bg-[#00FF95] transition"
             >
-              Enter Match Center
+              Discover Nearby Matches
             </button>
             <button
               onClick={handleLogout}
@@ -111,8 +120,8 @@ export default function LoginPage() {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D26A] to-[#00FF95] text-black shadow-lg shadow-[#00D26A]/20 mb-1">
           <Flame className="w-7 h-7 font-black" />
         </div>
-        <h2 className="text-2xl font-heading font-black text-white">CricHeroes Account Access</h2>
-        <p className="text-xs text-slate-400">Database Connected Grassroots Authentication</p>
+        <h2 className="text-2xl font-heading font-black text-white">CricHeroes Member Sign In</h2>
+        <p className="text-xs text-slate-400">Validated Gmail &amp; Phone Number Registration</p>
       </div>
 
       {/* Auth Card */}
@@ -134,13 +143,13 @@ export default function LoginPage() {
               isRegisterMode ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Register Account
+            Register Profile
           </button>
         </div>
 
         {error && (
-          <div className="flex items-center space-x-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="flex items-center space-x-2 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
             <span>{error}</span>
           </div>
         )}
@@ -165,13 +174,14 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Mobile Phone Number</label>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">10-Digit Mobile Number</label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                   <input
                     type="tel"
                     required
-                    placeholder="+91 98765 43210"
+                    maxLength="10"
+                    placeholder="e.g. 9876543210"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
@@ -199,7 +209,7 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Gmail Address</label>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Gmail Address (@gmail.com)</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
               <input
@@ -233,7 +243,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 hover:opacity-95 transition flex items-center justify-center space-x-2 mt-2"
           >
-            <span>{loading ? "Connecting Database..." : (isRegisterMode ? "Register & Connect Profile" : "Sign In to CricHeroes")}</span>
+            <span>{loading ? "Validating & Registering..." : (isRegisterMode ? "Register & Create Profile" : "Sign In")}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
@@ -241,7 +251,7 @@ export default function LoginPage() {
         {/* Demo Fast Login */}
         <div className="pt-3 border-t border-slate-800 space-y-2">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-            Or Click to Sign In as Verified Account
+            Or Click to Sign In as Verified Profile
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button

@@ -2,6 +2,7 @@ import React from 'react';
 import Navbar from './components/Navigation/Navbar';
 import TabBar from './components/Navigation/TabBar';
 import MatchCenter from './components/MatchCenter/MatchCenter';
+import GlobalSearchHub from './components/Search/GlobalSearchHub';
 import ScorerControl from './components/Scorer/ScorerControl';
 import TournamentCenter from './components/Tournaments/TournamentCenter';
 import FantasyHub from './components/Fantasy/FantasyHub';
@@ -42,6 +43,7 @@ export default function App() {
       {/* Main App Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'match_center' && <MatchCenter />}
+        {activeTab === 'search' && <GlobalSearchHub />}
         {activeTab === 'scorer' && <ScorerControl />}
         {activeTab === 'tournaments' && <TournamentCenter />}
         {activeTab === 'fantasy' && <FantasyHub />}
