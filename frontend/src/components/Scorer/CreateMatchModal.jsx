@@ -66,11 +66,11 @@ export default function CreateMatchModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-md bg-[#121824] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+      <div className="w-full max-w-md my-auto bg-[#121824] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-[#121824] z-10 pt-1">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-[#00D26A]/20 text-[#00D26A] flex items-center justify-center font-bold">
               <PlusCircle className="w-6 h-6" />
@@ -85,14 +85,14 @@ export default function CreateMatchModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        <form onSubmit={handleCreate} className="space-y-4">
-          {/* Team A */}
+        <form onSubmit={handleCreate} className="space-y-4 pt-1">
+          {/* Team A Selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Batting First / Team A</label>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Batting First (Team A)</label>
             <select
               value={teamA}
               onChange={(e) => setTeamA(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-[#00D26A]"
+              className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-[#00D26A]"
             >
               {teamList.map((t) => (
                 <option key={t.id} value={t.id}>{t.logo} {t.name} ({t.short_name})</option>
@@ -100,13 +100,13 @@ export default function CreateMatchModal({ isOpen, onClose }) {
             </select>
           </div>
 
-          {/* Team B */}
+          {/* Team B Selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Fielding / Team B</label>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Fielding / Bowling (Team B)</label>
             <select
               value={teamB}
               onChange={(e) => setTeamB(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-[#00D26A]"
+              className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-[#00D26A]"
             >
               {teamList.map((t) => (
                 <option key={t.id} value={t.id}>{t.logo} {t.name} ({t.short_name})</option>
@@ -142,7 +142,7 @@ export default function CreateMatchModal({ isOpen, onClose }) {
               <select
                 value={tossWinner}
                 onChange={(e) => setTossWinner(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-semibold"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-semibold"
               >
                 <option value={teamA}>Team A</option>
                 <option value={teamB}>Team B</option>
@@ -154,7 +154,7 @@ export default function CreateMatchModal({ isOpen, onClose }) {
               <select
                 value={tossDecision}
                 onChange={(e) => setTossDecision(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-semibold"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-semibold"
               >
                 <option value="bat">Bat First</option>
                 <option value="bowl">Bowl First</option>
