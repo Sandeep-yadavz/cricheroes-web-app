@@ -41,17 +41,6 @@ const INITIAL_BALL_HISTORY = [
     bowler_name: "Rashid Khan",
     shot_zone: "Mid Off",
     description: "14.2 Rashid Khan to Rohit Varma, NO BALL + 1 RUN! Smashed firmly towards Mid Off! Free Hit coming up!"
-  },
-  {
-    id: "b3",
-    over: "14.1",
-    runs: 6,
-    extra_type: null,
-    is_wicket: false,
-    striker_name: "Rohit Varma",
-    bowler_name: "Rashid Khan",
-    shot_zone: "Mid Wicket",
-    description: "14.1 Rashid Khan to Rohit Varma, SIX RUNS! Massive hit high into the stands at Mid Wicket!"
   }
 ];
 
@@ -179,18 +168,20 @@ export function CricketProvider({ children }) {
   };
 
   const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, out_batter = "striker", new_batter_id = "p4", shot_zone = "Cover" }) => {
-    if (is_wicket) {
-      setCelebrationType('wicket');
-      if (soundEnabled) playMatchSound('wicket');
-    } else if (runs === 6) {
-      setCelebrationType('six');
-      if (soundEnabled) playMatchSound('six');
-    } else if (runs === 4) {
-      setCelebrationType('four');
-      if (soundEnabled) playMatchSound('four');
-    } else if (soundEnabled) {
-      playMatchSound('dot');
-    }
+    try {
+      if (is_wicket) {
+        setCelebrationType('wicket');
+        if (soundEnabled) playMatchSound('wicket');
+      } else if (runs === 6) {
+        setCelebrationType('six');
+        if (soundEnabled) playMatchSound('six');
+      } else if (runs === 4) {
+        setCelebrationType('four');
+        if (soundEnabled) playMatchSound('four');
+      } else if (soundEnabled) {
+        playMatchSound('dot');
+      }
+    } catch (e) {}
 
     try {
       const res = await apiClient.post(`/api/matches/${match.id}/score-ball`, {
@@ -204,10 +195,9 @@ export function CricketProvider({ children }) {
         shot_zone
       });
 
-      if (res && res.match) {
+      if (res && res.match && res.match.id) {
         setMatch(res.match);
 
-        // Speak Live Commentary Text using Speech Synth
         if (soundEnabled && res.match.ball_history && res.match.ball_history.length > 0) {
           const latestBall = res.match.ball_history[0];
           commentaryVoice(latestBall.description || `${latestBall.over} ${latestBall.striker_name} scores ${latestBall.runs} runs.`);
@@ -216,73 +206,96 @@ export function CricketProvider({ children }) {
       }
     } catch (e) {}
 
-    // Fallback local update
+    // Safe Fallback Local Update with Null Checks
     setMatch((prevMatch) => {
-      const newMatch = JSON.parse(JSON.stringify(prevMatch));
-      const currKey = `innings_${newMatch.current_innings}`;
-      const inn = newMatch[currKey];
-
-      let addedRuns = runs;
-      let isLegal = true;
-
-      if (extra_type === 'wide' || extra_type === 'noball') {
-        isLegal = false;
-        addedRuns += 1;
-        inn.extras[`${extra_type}s`] += 1;
-      } else if (extra_type === 'bye' || extra_type === 'legbye') {
-        inn.extras[`${extra_type}s`] += runs;
-      }
-
-      inn.runs += addedRuns;
-
-      let completedOvers = Math.floor(inn.overs);
-      let balls = Math.round((inn.overs - completedOvers) * 10);
-
-      if (isLegal) {
-        balls += 1;
-        if (balls === 6) {
-          completedOvers += 1;
-          balls = 0;
+      try {
+        const newMatch = JSON.parse(JSON.stringify(prevMatch || INITIAL_MATCH));
+        const cInnings = newMatch.current_innings || 1;
+        const currKey = `innings_${cInnings}`;
+        
+        if (!newMatch[currKey]) {
+          newMatch[currKey] = {
+            batting_team_id: "t1", bowling_team_id: "t2", runs: 0, wickets: 0, overs: 0.0,
+            extras: { wides: 0, noballs: 0, byes: 0, legbyes: 0 },
+            striker_id: "p1", non_striker_id: "p2", current_bowler_id: "p8",
+            batting_stats: [], bowling_stats: []
+          };
         }
+
+        const inn = newMatch[currKey];
+        if (!inn.extras) inn.extras = { wides: 0, noballs: 0, byes: 0, legbyes: 0 };
+        if (!inn.batting_stats) inn.batting_stats = [];
+
+        let addedRuns = runs;
+        let isLegal = true;
+
+        if (extra_type === 'wide') {
+          isLegal = false;
+          addedRuns = 1 + runs;
+          inn.extras.wides = (inn.extras.wides || 0) + 1;
+        } else if (extra_type === 'noball') {
+          isLegal = false;
+          addedRuns = 1 + runs;
+          inn.extras.noballs = (inn.extras.noballs || 0) + 1;
+        } else if (extra_type === 'bye') {
+          inn.extras.byes = (inn.extras.byes || 0) + runs;
+        } else if (extra_type === 'legbye') {
+          inn.extras.legbyes = (inn.extras.legbyes || 0) + runs;
+        }
+
+        inn.runs = (inn.runs || 0) + addedRuns;
+
+        let completedOvers = Math.floor(inn.overs || 0);
+        let balls = Math.round(((inn.overs || 0) - completedOvers) * 10);
+
+        if (isLegal) {
+          balls += 1;
+          if (balls === 6) {
+            completedOvers += 1;
+            balls = 0;
+          }
+        }
+
+        const overStr = `${completedOvers}.${balls}`;
+        inn.overs = parseFloat(overStr);
+
+        const strikerObj = players[inn.striker_id] || { name: "Rohit Varma" };
+        const bowlerObj = players[inn.current_bowler_id] || { name: "Rashid Khan" };
+
+        let descText = "";
+        if (is_wicket) {
+          inn.wickets = (inn.wickets || 0) + 1;
+          const newB = players[new_batter_id] || { name: "Hardik Patel" };
+          descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, OUT (${wicket_type || 'Bowled'})! Big wicket falls at ${shot_zone}! New batter ${newB.name} enters!`;
+        } else if (runs === 6) {
+          descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, SIX RUNS! Massive hit over ${shot_zone}!`;
+        } else if (runs === 4) {
+          descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, FOUR RUNS! Driven nicely to ${shot_zone}!`;
+        } else {
+          descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, ${runs} run(s) towards ${shot_zone}.`;
+        }
+
+        const newBall = {
+          id: `b_${Date.now()}`,
+          over: overStr,
+          runs: addedRuns,
+          extra_type,
+          is_wicket,
+          striker_name: strikerObj.name,
+          bowler_name: bowlerObj.name,
+          shot_zone: shot_zone,
+          description: descText
+        };
+
+        if (!newMatch.ball_history) newMatch.ball_history = [];
+        newMatch.ball_history.unshift(newBall);
+
+        if (soundEnabled) commentaryVoice(descText);
+
+        return newMatch;
+      } catch (err) {
+        return prevMatch;
       }
-
-      const overStr = `${completedOvers}.${balls}`;
-      inn.overs = parseFloat(overStr);
-
-      const strikerObj = players[inn.striker_id] || { name: "Rohit Varma" };
-      const bowlerObj = players[inn.current_bowler_id] || { name: "Rashid Khan" };
-
-      let descText = "";
-      if (is_wicket) {
-        inn.wickets += 1;
-        const newB = players[new_batter_id] || { name: "Hardik Patel" };
-        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, OUT (${wicket_type || 'Bowled'})! Big wicket falls at ${shot_zone}! New batter ${newB.name} enters!`;
-      } else if (runs === 6) {
-        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, SIX RUNS! Massive hit over ${shot_zone}!`;
-      } else if (runs === 4) {
-        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, FOUR RUNS! Driven nicely to ${shot_zone}!`;
-      } else {
-        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, ${runs} run(s) towards ${shot_zone}.`;
-      }
-
-      const newBall = {
-        id: `b_${Date.now()}`,
-        over: overStr,
-        runs: addedRuns,
-        extra_type,
-        is_wicket,
-        striker_name: strikerObj.name,
-        bowler_name: bowlerObj.name,
-        shot_zone: shot_zone,
-        description: descText
-      };
-
-      if (!newMatch.ball_history) newMatch.ball_history = [];
-      newMatch.ball_history.unshift(newBall);
-
-      if (soundEnabled) commentaryVoice(descText);
-
-      return newMatch;
     });
   };
 

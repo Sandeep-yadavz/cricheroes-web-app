@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import ReactDOM from 'react-dom';
 import { Flame, Sparkles, Trophy, ShieldAlert } from 'lucide-react';
 
 export default function CelebrationOverlay({ type, onClose }) {
-  // type can be 'four', 'six', or 'wicket'
+  // type can be 'four', 'six', 'wicket' or null
   const [particles, setParticles] = useState([]);
 
   useEffect(() => {
-    // Generate 40 explosive particle coordinates
-    const pList = Array.from({ length: 40 }).map((_, i) => ({
+    if (!type) return;
+
+    // Generate 30 explosive particle coordinates
+    const pList = Array.from({ length: 30 }).map((_, i) => ({
       id: i,
-      x: (Math.random() - 0.5) * 800,
-      y: (Math.random() - 0.5) * 800,
-      scale: Math.random() * 1.5 + 0.5,
+      x: (Math.random() - 0.5) * 600,
+      y: (Math.random() - 0.5) * 600,
+      scale: Math.random() * 1.3 + 0.6,
       rotation: Math.random() * 360,
       emoji: type === 'six' ? ['🚀', '💥', '6️⃣', '✨', '🎆'][i % 5] : type === 'four' ? ['🔥', '4️⃣', '⚡', '🎉', '🟩'][i % 5] : ['💥', '☝️', '🔴', '🔥', '⚡'][i % 5]
     }));
@@ -20,10 +21,10 @@ export default function CelebrationOverlay({ type, onClose }) {
 
     const timer = setTimeout(() => {
       onClose();
-    }, 2800);
+    }, 2200);
 
     return () => clearTimeout(timer);
-  }, [type]);
+  }, [type, onClose]);
 
   if (!type) return null;
 
@@ -31,8 +32,8 @@ export default function CelebrationOverlay({ type, onClose }) {
   const isFour = type === 'four';
   const isWicket = type === 'wicket';
 
-  const overlayContent = (
-    <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/85 backdrop-blur-md pointer-events-none select-none overflow-hidden animate-fadeIn">
+  return (
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/85 backdrop-blur-md pointer-events-none select-none overflow-hidden animate-fadeIn">
       
       {/* Exploding Particles Background */}
       <div className="absolute inset-0 flex items-center justify-center">
@@ -41,7 +42,7 @@ export default function CelebrationOverlay({ type, onClose }) {
             key={p.id}
             style={{
               transform: `translate(${p.x}px, ${p.y}px) scale(${p.scale}) rotate(${p.rotation}deg)`,
-              transition: 'all 2.2s cubic-bezier(0.1, 0.8, 0.3, 1)',
+              transition: 'all 1.8s cubic-bezier(0.1, 0.8, 0.3, 1)',
               opacity: 0.9
             }}
             className="absolute text-3xl sm:text-5xl animate-bounce"
@@ -95,6 +96,4 @@ export default function CelebrationOverlay({ type, onClose }) {
 
     </div>
   );
-
-  return ReactDOM.createPortal(overlayContent, document.body);
 }
