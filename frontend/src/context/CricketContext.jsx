@@ -122,14 +122,29 @@ const INITIAL_MATCH = {
   wagon_wheel: []
 };
 
+const normalizeTeams = (rawTeams) => {
+  if (!rawTeams) return {};
+  if (Array.isArray(rawTeams)) {
+    return rawTeams.reduce((acc, t) => {
+      if (t && t.id) acc[t.id] = t;
+      return acc;
+    }, {});
+  }
+  return rawTeams;
+};
+
 export function CricketProvider({ children }) {
   const [activeTab, setActiveTab] = useState('match_center');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [match, setMatch] = useState(INITIAL_MATCH);
-  const [teams, setTeams] = useState(INITIAL_TEAMS);
+  const [teams, setTeamsState] = useState(INITIAL_TEAMS);
   const [players, setPlayers] = useState(INITIAL_PLAYERS);
   const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
   const [celebrationType, setCelebrationType] = useState(null);
+
+  const setTeams = (newTeams) => {
+    setTeamsState(normalizeTeams(newTeams));
+  };
 
   const [currentUser, setCurrentUser] = useState({
     id: "u1",
@@ -149,7 +164,7 @@ export function CricketProvider({ children }) {
         const matchRes = await apiClient.get('/api/matches/m1');
         if (matchRes && matchRes.match) {
           setMatch(matchRes.match);
-          if (matchRes.teams) setTeams(matchRes.teams);
+          if (matchRes.teams) setTeamsState(normalizeTeams(matchRes.teams));
           if (matchRes.players) setPlayers(matchRes.players);
         }
       } catch (err) {}
@@ -206,7 +221,6 @@ export function CricketProvider({ children }) {
       }
     } catch (e) {}
 
-    // Safe Fallback Local Update with Null Checks
     setMatch((prevMatch) => {
       try {
         const newMatch = JSON.parse(JSON.stringify(prevMatch || INITIAL_MATCH));

@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, Calendar, Clock, Trophy, Flame } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
+import TeamLogo from '../Common/TeamLogo';
 
 export default function MatchHeader() {
   const { match, teams } = useCricket();
@@ -33,9 +34,7 @@ export default function MatchHeader() {
         
         {/* Team A */}
         <div className="flex items-center space-x-4">
-          <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl shadow-inner">
-            {teamA.logo}
-          </div>
+          <TeamLogo logo={teamA.logo} name={teamA.name} size="lg" />
           <div>
             <h3 className="font-heading font-black text-white text-xl">{teamA.name}</h3>
             <p className="text-xs text-slate-400 font-bold">Batting Innings {match.current_innings || 1}</p>
@@ -59,9 +58,7 @@ export default function MatchHeader() {
             <h3 className="font-heading font-black text-white text-xl">{teamB.name}</h3>
             <p className="text-xs text-slate-400 font-bold">Bowling Team</p>
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl shadow-inner">
-            {teamB.logo}
-          </div>
+          <TeamLogo logo={teamB.logo} name={teamB.name} size="lg" />
         </div>
 
       </div>
