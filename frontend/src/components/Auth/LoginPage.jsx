@@ -8,7 +8,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('SCORER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +18,7 @@ export default function LoginPage() {
 
     try {
       if (isRegisterMode) {
-        await handleRegister(name, email, password, role);
+        await handleRegister(name, email, password);
       } else {
         await handleLogin(email, password);
       }
@@ -31,10 +30,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = async (demoRole) => {
+  const handleDemoLogin = async (userType) => {
     setLoading(true);
     try {
-      if (demoRole === 'SCORER') {
+      if (userType === 'USER1') {
         await handleLogin('scorer@cricheroes.in', 'scorer123');
       } else {
         await handleLogin('organizer@cricheroes.in', 'organizer123');
@@ -61,11 +60,10 @@ export default function LoginPage() {
             <p className="text-xs text-slate-400 mt-1">{currentUser.email}</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400 font-bold uppercase">Authorization Role:</span>
-            <span className="font-extrabold text-[#00D26A] px-3 py-1 rounded-full bg-[#00D26A]/10 border border-[#00D26A]/30">
-              {currentUser.role === 'SCORER' ? '🛡️ Official Scorer' : (currentUser.role === 'ORGANIZER' ? '🏆 Organizer' : '🏏 Player')}
-            </span>
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-xs">
+            <p className="text-slate-400 font-semibold">
+              Create a tournament to become its <strong>Organizer</strong>, or get assigned as <strong>Official Scorer</strong> for any match!
+            </p>
           </div>
 
           <div className="flex items-center space-x-3 pt-2">
@@ -73,7 +71,7 @@ export default function LoginPage() {
               onClick={() => setActiveTab('scorer')}
               className="flex-1 py-3.5 rounded-xl bg-[#00D26A] text-black font-extrabold text-xs shadow-lg shadow-[#00D26A]/20 hover:bg-[#00FF95] transition"
             >
-              Go to Scorer Deck
+              Go to Scorer Console
             </button>
             <button
               onClick={handleLogout}
@@ -95,8 +93,8 @@ export default function LoginPage() {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D26A] to-[#00FF95] text-black shadow-lg shadow-[#00D26A]/20 mb-1">
           <Flame className="w-7 h-7 font-black" />
         </div>
-        <h2 className="text-2xl font-heading font-black text-white">CricHeroes Member Pass</h2>
-        <p className="text-xs text-slate-400">Sign in to access Scorer Deck, manage tournaments &amp; sync live statistics</p>
+        <h2 className="text-2xl font-heading font-black text-white">CricHeroes Member Access</h2>
+        <p className="text-xs text-slate-400">Sign in to organize tournaments, record live scores &amp; view stats</p>
       </div>
 
       {/* Auth Card */}
@@ -178,27 +176,12 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {isRegisterMode && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Role / Authorization Level</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-[#00D26A]"
-              >
-                <option value="SCORER">🛡️ Official Match Scorer (Ball Entry &amp; Match Edits)</option>
-                <option value="ORGANIZER">🏆 Tournament Organizer (Tournament Setup &amp; Brackets)</option>
-                <option value="PLAYER">🏏 Player / Fan (View Cards &amp; Commentary)</option>
-              </select>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
             className="w-full py-4 rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 hover:opacity-95 transition flex items-center justify-center space-x-2"
           >
-            <span>{loading ? "Authenticating..." : (isRegisterMode ? "Register CricHeroes Account" : "Sign In to Account")}</span>
+            <span>{loading ? "Authenticating..." : (isRegisterMode ? "Register Account" : "Sign In")}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
@@ -206,20 +189,20 @@ export default function LoginPage() {
         {/* Fast Demo Accounts */}
         <div className="pt-4 border-t border-slate-800 space-y-3">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block text-center">
-            Or Click to Sign In as Pre-Verified Account
+            Or Click to Sign In as Pre-Verified User
           </span>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => handleDemoLogin('SCORER')}
+              onClick={() => handleDemoLogin('USER1')}
               className="py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5"
             >
-              <span>🛡️ Demo Scorer</span>
+              <span>👤 Rohit Varma</span>
             </button>
             <button
-              onClick={() => handleDemoLogin('ORGANIZER')}
+              onClick={() => handleDemoLogin('USER2')}
               className="py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5"
             >
-              <span>🏆 Demo Organizer</span>
+              <span>👤 Amit Sharma</span>
             </button>
           </div>
         </div>

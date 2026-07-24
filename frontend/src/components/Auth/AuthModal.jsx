@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, ShieldCheck, UserCheck, Lock, Mail, User, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, Lock, Mail, User, AlertCircle } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
 export default function AuthModal({ isOpen, onClose }) {
@@ -9,7 +9,6 @@ export default function AuthModal({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('SCORER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +21,7 @@ export default function AuthModal({ isOpen, onClose }) {
 
     try {
       if (isRegisterMode) {
-        await handleRegister(name, email, password, role);
+        await handleRegister(name, email, password);
       } else {
         await handleLogin(email, password);
       }
@@ -34,10 +33,10 @@ export default function AuthModal({ isOpen, onClose }) {
     }
   };
 
-  const handleDemoLogin = async (demoRole) => {
+  const handleDemoLogin = async (accountType) => {
     setLoading(true);
     try {
-      if (demoRole === 'SCORER') {
+      if (accountType === 'USER1') {
         await handleLogin('scorer@cricheroes.in', 'scorer123');
       } else {
         await handleLogin('organizer@cricheroes.in', 'organizer123');
@@ -62,9 +61,9 @@ export default function AuthModal({ isOpen, onClose }) {
             </div>
             <div>
               <h3 className="text-lg font-heading font-bold text-white">
-                {isRegisterMode ? "Create CricHeroes Pass" : "Official Scorer Sign In"}
+                {isRegisterMode ? "Create CricHeroes Account" : "Sign In to CricHeroes"}
               </h3>
-              <p className="text-xs text-slate-400">Authentication &amp; RBAC Authorization</p>
+              <p className="text-xs text-slate-400">Universal Grassroots Account Access</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
@@ -128,47 +127,32 @@ export default function AuthModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {isRegisterMode && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Authorization Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:border-[#00D26A]"
-              >
-                <option value="SCORER">🛡️ Official Match Scorer</option>
-                <option value="ORGANIZER">🏆 Tournament Director / Organizer</option>
-                <option value="PLAYER">🏏 Player / Fan</option>
-              </select>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
             className="w-full py-3.5 rounded-xl bg-[#00D26A] hover:bg-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 transition"
           >
-            {loading ? "Authenticating..." : (isRegisterMode ? "Create Account & Sign In" : "Sign In to CricHeroes")}
+            {loading ? "Authenticating..." : (isRegisterMode ? "Create Account & Sign In" : "Sign In")}
           </button>
         </form>
 
         {/* Demo Fast Login Buttons */}
         <div className="pt-2 border-t border-slate-800 space-y-2">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-            Or Sign In as Pre-Verified Account
+            Or Quick Sign In as Pre-Verified User
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => handleDemoLogin('SCORER')}
+              onClick={() => handleDemoLogin('USER1')}
               className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold transition"
             >
-              🛡️ Demo Scorer
+              👤 Rohit Varma
             </button>
             <button
-              onClick={() => handleDemoLogin('ORGANIZER')}
+              onClick={() => handleDemoLogin('USER2')}
               className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold transition"
             >
-              🏆 Demo Organizer
+              👤 Amit Sharma
             </button>
           </div>
         </div>
