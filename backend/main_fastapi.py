@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
     description="High performance Python FastAPI backend for scoring, authentication, RBAC authorization, live commentary, NRR calculator, and tournament management.",
-    version="1.2.0"
+    version="1.3.0"
 )
 
 app.add_middleware(
@@ -322,41 +322,6 @@ INITIAL_DATA = {
                 {"x": 220, "y": 90, "runs": 4, "shot_type": "Cover"},
                 {"x": 160, "y": 190, "runs": 1, "shot_type": "Mid Off"}
             ]
-        },
-        {
-            "id": "m2",
-            "tournament_id": "tour1",
-            "tournament_name": "Grassroots Champions Trophy 2026",
-            "team_a": "t3",
-            "team_b": "t4",
-            "overs_limit": 20,
-            "status": "COMPLETED",
-            "result": "Bangalore Blasters won by 18 runs",
-            "toss_winner": "t3",
-            "toss_decision": "bat",
-            "current_innings": 2,
-            "innings_1": {
-                "batting_team_id": "t3",
-                "bowling_team_id": "t4",
-                "runs": 182,
-                "wickets": 4,
-                "overs": 20.0,
-                "extras": {"wides": 4, "noballs": 1, "byes": 0, "legbyes": 2},
-                "batting_stats": [],
-                "bowling_stats": []
-            },
-            "innings_2": {
-                "batting_team_id": "t4",
-                "bowling_team_id": "t3",
-                "runs": 164,
-                "wickets": 8,
-                "overs": 20.0,
-                "extras": {"wides": 6, "noballs": 0, "byes": 1, "legbyes": 2},
-                "batting_stats": [],
-                "bowling_stats": []
-            },
-            "ball_history": [],
-            "wagon_wheel": []
         }
     ]
 }
@@ -441,6 +406,48 @@ def calculate_nrr(runs_scored: int, overs_faced: float, runs_conceded: int, over
     sign = "+" if nrr_val >= 0 else ""
     return f"{sign}{nrr_val:.3f}"
 
+def create_default_match_structure(match_id: str, team_a: str = "t1", team_b: str = "t2", overs_limit: int = 20):
+    return {
+        "id": match_id,
+        "tournament_id": "tour1",
+        "tournament_name": "Grassroots Champions Trophy 2026",
+        "team_a": team_a,
+        "team_b": team_b,
+        "overs_limit": overs_limit,
+        "status": "LIVE",
+        "toss_winner": team_a,
+        "toss_decision": "bat",
+        "current_innings": 1,
+        "innings_1": {
+            "batting_team_id": team_a,
+            "bowling_team_id": team_b,
+            "runs": 0,
+            "wickets": 0,
+            "overs": 0.0,
+            "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
+            "striker_id": "p1",
+            "non_striker_id": "p2",
+            "current_bowler_id": "p8",
+            "batting_stats": [],
+            "bowling_stats": []
+        },
+        "innings_2": {
+            "batting_team_id": team_b,
+            "bowling_team_id": team_a,
+            "runs": 0,
+            "wickets": 0,
+            "overs": 0.0,
+            "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
+            "striker_id": "p5",
+            "non_striker_id": "p7",
+            "current_bowler_id": "p3",
+            "batting_stats": [],
+            "bowling_stats": []
+        },
+        "ball_history": [],
+        "wagon_wheel": []
+    }
+
 # --- API Endpoints ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -458,7 +465,7 @@ def root_index():
         </style>
       </head>
       <body>
-        <h1>🏏 CricHeroes Python FastAPI Engine (v1.2.0)</h1>
+        <h1>🏏 CricHeroes Python FastAPI Engine (v1.3.0 Dynamic Match Creation)</h1>
         <p>Live scoring backend running for Grassroots Cricket.</p>
         <div class="card">
           <h3>Interactive Documentation & Endpoints:</h3>
@@ -476,7 +483,7 @@ def root_index():
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "app": "CricHeroes Python API", "version": "1.2.0", "auth_enabled": True}
+    return {"status": "ok", "app": "CricHeroes Python API", "version": "1.3.0", "auth_enabled": True}
 
 # --- Auth Endpoints ---
 
@@ -540,12 +547,23 @@ def get_matches():
     data = load_db()
     return data["matches"]
 
+@app.post("/api/matches")
+def create_match(match_data: dict, authorization: Optional[str] = Header(None)):
+    user = require_scorer_role(authorization)
+    data = load_db()
+    data["matches"].insert(0, match_data)
+    save_db(data)
+    return {"status": "success", "match": match_data}
+
 @app.get("/api/matches/{match_id}")
 def get_match_detail(match_id: str):
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+        # Dynamically initialize if newly created match from client
+        match = create_default_match_structure(match_id)
+        data["matches"].insert(0, match)
+        save_db(data)
     
     team_dict = {t["id"]: t for t in data["teams"]}
     player_dict = {p["id"]: p for p in data["players"]}
@@ -563,7 +581,9 @@ def score_ball(match_id: str, ball_data: BallInput, authorization: Optional[str]
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+        # Dynamically register match structure so new custom client matches score seamlessly!
+        match = create_default_match_structure(match_id)
+        data["matches"].insert(0, match)
     
     curr_inn_key = f"innings_{match['current_innings']}"
     inn = match[curr_inn_key]

@@ -1,114 +1,90 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://127.0.0.1:8000";
+
+let authToken = localStorage.getItem("cricheroes_token") || null;
+
+export const apiClient = {
+  setToken: (token) => {
+    authToken = token;
+    if (token) localStorage.setItem("cricheroes_token", token);
+    else localStorage.removeItem("cricheroes_token");
+  },
+  clearToken: () => {
+    authToken = null;
+    localStorage.removeItem("cricheroes_token");
+  },
+  get: async (endpoint) => {
+    try {
+      const headers = {};
+      if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+      const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      return null;
+    }
+  },
+  post: async (endpoint, body) => {
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+      const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body || {})
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || "API Request Failed");
+      }
+      return await res.json();
+    } catch (e) {
+      throw e;
+    }
+  }
+};
 
 export async function loginUser(email, password) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Login failed");
-    return data;
-  } catch (err) {
-    throw err;
-  }
+  return apiClient.post("/api/auth/login", { email, password });
 }
 
 export async function registerUser(name, email, password, role) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Registration failed");
-    return data;
-  } catch (err) {
-    throw err;
-  }
+  return apiClient.post("/api/auth/register", { name, email, password, role });
 }
 
 export async function fetchMatches() {
-  try {
-    const res = await fetch(`${API_BASE}/matches`);
-    if (!res.ok) throw new Error("Failed to fetch matches");
-    return await res.json();
-  } catch (err) {
-    return null;
-  }
+  return apiClient.get("/api/matches");
 }
 
 export async function fetchMatchDetail(matchId) {
-  try {
-    const res = await fetch(`${API_BASE}/matches/${matchId}`);
-    if (!res.ok) throw new Error("Failed to fetch match detail");
-    return await res.json();
-  } catch (err) {
-    return null;
-  }
+  return apiClient.get(`/api/matches/${matchId}`);
 }
 
 export async function sendScoreBall(matchId, ballData, token = null) {
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    const res = await fetch(`${API_BASE}/matches/${matchId}/score-ball`, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(ballData),
-    });
-    if (!res.ok) throw new Error("Failed to score ball");
-    return await res.json();
-  } catch (err) {
-    return null;
-  }
+  if (token) apiClient.setToken(token);
+  return apiClient.post(`/api/matches/${matchId}/score-ball`, ballData);
 }
 
 export async function sendUndoBall(matchId, token = null) {
-  try {
-    const headers = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    const res = await fetch(`${API_BASE}/matches/${matchId}/undo-ball`, {
-      method: "POST",
-      headers: headers
-    });
-    if (!res.ok) throw new Error("Failed to undo ball");
-    return await res.json();
-  } catch (err) {
-    return null;
-  }
+  if (token) apiClient.setToken(token);
+  return apiClient.post(`/api/matches/${matchId}/undo-ball`, {});
 }
 
 export async function fetchTournaments() {
-  try {
-    const res = await fetch(`${API_BASE}/tournaments`);
-    if (!res.ok) throw new Error("Failed to fetch tournaments");
-    return await res.json();
-  } catch (err) {
-    return null;
-  }
+  return apiClient.get("/api/tournaments");
 }
 
 export async function fetchPlayers() {
-  try {
-    const res = await fetch(`${API_BASE}/players`);
-    if (!res.ok) throw new Error("Failed to fetch players");
-    return await res.json();
-  } catch (err) {
-    return null;
-  }
+  return apiClient.get("/api/players");
 }
 
 export async function calculateNRR(runsScored, oversFaced, runsConceded, oversBowled) {
   try {
     const query = `runs_scored=${runsScored}&overs_faced=${oversFaced}&runs_conceded=${runsConceded}&overs_bowled=${oversBowled}`;
-    const res = await fetch(`${API_BASE}/stats/nrr-calculator?${query}`);
-    if (!res.ok) throw new Error("Failed to calculate NRR");
-    return await res.json();
+    const data = await apiClient.get(`/api/stats/nrr-calculator?${query}`);
+    if (data) return data;
+    throw new Error("Offline fallback");
   } catch (err) {
     const facedBalls = Math.floor(oversFaced) * 6 + Math.round((oversFaced % 1) * 10);
     const bowledBalls = Math.floor(oversBowled) * 6 + Math.round((oversBowled % 1) * 10);

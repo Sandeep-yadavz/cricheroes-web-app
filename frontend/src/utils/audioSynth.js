@@ -67,3 +67,9 @@ class MatchAudio {
 }
 
 export const matchAudio = new MatchAudio();
+
+export function playMatchSound(type) {
+  if (type === 'four') matchAudio.playBoundaryFour();
+  else if (type === 'six') matchAudio.playBoundarySix();
+  else if (type === 'wicket') matchAudio.playWicket();
+}
