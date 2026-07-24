@@ -80,7 +80,7 @@ const INITIAL_MATCH = {
 };
 
 export function CricketProvider({ children }) {
-  const [activeTab, setActiveTab] = useState('match_center'); // match_center, scorer, tournaments, fantasy, players, nrr, login
+  const [activeTab, setActiveTab] = useState('match_center');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [match, setMatch] = useState(INITIAL_MATCH);
   const [teams, setTeams] = useState(INITIAL_TEAMS);
@@ -95,6 +95,23 @@ export function CricketProvider({ children }) {
 
   const [isWicketModalOpen, setIsWicketModalOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
+
+  // Role-Based Permission Check Helper
+  const hasPermission = (action) => {
+    if (!currentUser) return false;
+    const role = currentUser.role;
+
+    if (action === 'SCORE_BALL' || action === 'UNDO_BALL' || action === 'END_MATCH') {
+      return role === 'SCORER' || role === 'ORGANIZER';
+    }
+    if (action === 'CREATE_TEAM' || action === 'MANAGE_TOURNAMENT' || action === 'CREATE_MATCH') {
+      return role === 'ORGANIZER';
+    }
+    if (action === 'VIEW_STATS' || action === 'VIEW_SCORECARD') {
+      return true; // Everyone can view scorecards
+    }
+    return false;
+  };
 
   // Sync with Backend FastAPI on load
   useEffect(() => {
@@ -114,6 +131,11 @@ export function CricketProvider({ children }) {
   }, []);
 
   const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, shot_zone = "Cover" }) => {
+    if (!hasPermission('SCORE_BALL')) {
+      alert("Permission Error: Only Official Scorers or Tournament Admins can record match balls.");
+      return;
+    }
+
     if (soundEnabled) {
       if (is_wicket) playMatchSound('wicket');
       else if (runs === 6) playMatchSound('six');
@@ -139,7 +161,7 @@ export function CricketProvider({ children }) {
         return;
       }
     } catch (e) {
-      console.log("Backend offline or error, updating local state fallback");
+      console.log("Backend offline or fallback");
     }
 
     // Local state fallback calculation
@@ -221,23 +243,16 @@ export function CricketProvider({ children }) {
         commentary: commText
       });
 
-      if (isLegal && runs % 2 === 1) {
-        const temp = inn.striker_id;
-        inn.striker_id = inn.non_striker_id;
-        inn.non_striker_id = temp;
-      }
-
-      if (isLegal && balls === 0 && (completedOvers > 0)) {
-        const temp = inn.striker_id;
-        inn.striker_id = inn.non_striker_id;
-        inn.non_striker_id = temp;
-      }
-
       return newMatch;
     });
   };
 
   const handleUndoBall = async () => {
+    if (!hasPermission('UNDO_BALL')) {
+      alert("Permission Error: Only Official Scorers can undo balls.");
+      return;
+    }
+
     try {
       const res = await apiClient.post(`/api/matches/${match.id}/undo-ball`);
       if (res && res.match) {
@@ -321,6 +336,7 @@ export function CricketProvider({ children }) {
         players,
         setPlayers,
         currentUser,
+        hasPermission,
         handleLogin,
         handleRegister,
         handleLogout,

@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
-import { RotateCcw, AlertTriangle, UserCheck, Flame, Shield, ArrowRightLeft, Volume2, Target, Trophy, Award } from 'lucide-react';
+import { RotateCcw, AlertTriangle, UserCheck, Flame, Shield, ArrowRightLeft, Volume2, Target, Trophy, Award, Lock, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import WicketModal from './WicketModal';
 import MatchWinnerModal from './MatchWinnerModal';
 import DraggableFieldingWagonWheel from './DraggableFieldingWagonWheel';
 
 export default function ScorerControl() {
-  const { match, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser } = useCricket();
+  const { match, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser, hasPermission, handleLogin, setActiveTab } = useCricket();
   const [selectedShotZone, setSelectedShotZone] = useState('Cover');
-  const [showWagonWheel, setShowWagonWheel] = useState(true);
 
   const currKey = `innings_${match.current_innings}`;
   const inn = match[currKey] || match.innings_1;
   const strikerStat = inn.batting_stats.find(b => b.player_id === inn.striker_id) || { name: "Rohit Varma", runs: 68, balls: 42 };
   const nonStrikerStat = inn.batting_stats.find(b => b.player_id === inn.non_striker_id) || { name: "Virat Saxena", runs: 45, balls: 31 };
 
+  const canScore = hasPermission('SCORE_BALL');
+
   const onScore = (runs, extra_type = null) => {
+    if (!canScore) {
+      alert("Permission Error: Only Official Match Scorers or Tournament Admins can record ball scores.");
+      return;
+    }
     handleScoreBall({
       runs,
       extra_type,
@@ -23,6 +28,53 @@ export default function ScorerControl() {
       shot_zone: selectedShotZone
     });
   };
+
+  const handleSwitchToDemoScorer = async () => {
+    await handleLogin('scorer@cricheroes.in', 'scorer123');
+  };
+
+  if (!canScore) {
+    return (
+      <div className="max-w-xl mx-auto py-12 pb-24 space-y-6">
+        <div className="glass-card rounded-3xl p-8 border border-red-500/40 text-center space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-red-500/20 text-red-400 flex items-center justify-center font-bold border border-red-500/30 shadow-xl">
+            <Lock className="w-10 h-10" />
+          </div>
+
+          <div>
+            <span className="text-xs font-extrabold uppercase text-red-400 tracking-wider block">ROLE-BASED AUTHORIZATION RESTRICTION</span>
+            <h2 className="text-2xl font-heading font-black text-white mt-1">Scorer Console Locked</h2>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              You are currently signed in as <strong className="text-white">{currentUser ? currentUser.name : "Guest/Player"} ({currentUser ? currentUser.role : "PLAYER"})</strong>.
+              Only verified <span className="text-[#00D26A] font-bold">Official Match Scorers (SCORER)</span> or <span className="text-amber-400 font-bold">Tournament Directors (ORGANIZER)</span> have authorization to enter live ball-by-ball scores.
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={handleSwitchToDemoScorer}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 hover:opacity-95 transition flex items-center justify-center space-x-2"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>Switch to Demo Official Scorer Account</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => setActiveTab('match_center')}
+              className="w-full py-3 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 transition"
+            >
+              Return to Live Scorecard &amp; Commentary
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24">
@@ -34,7 +86,12 @@ export default function ScorerControl() {
             <Shield className="w-8 h-8" />
           </div>
           <div>
-            <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider">Official Scorer Console</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider">Official Scorer Console</span>
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#00D26A]/10 text-[#00D26A] border border-[#00D26A]/30 uppercase">
+                {currentUser?.role} Authorized
+              </span>
+            </div>
             <h2 className="text-2xl font-heading font-black text-white">Ball-by-Ball Live Scoring</h2>
             <p className="text-xs text-slate-400 font-semibold">Match ID: {match.id} • {match.tournament_name}</p>
           </div>
@@ -107,7 +164,7 @@ export default function ScorerControl() {
       </div>
 
       {/* Draggable Wagon Wheel & Fielder Placement Widget */}
-      <DraggableFieldingWagonWheel onZoneSelect={(zone) => setSelectedShotZone(zone)} selectedZone={selectedShotZone} />
+      <DraggableFieldingWagonWheel onZoneSelect={(zone) => setSelectedShotZone(zone)} />
 
       <WicketModal />
       <MatchWinnerModal isOpen={false} onClose={() => {}} />
