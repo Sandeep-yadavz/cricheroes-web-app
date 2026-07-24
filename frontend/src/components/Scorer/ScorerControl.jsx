@@ -10,7 +10,7 @@ export default function ScorerControl() {
   const { match, teams, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser } = useCricket();
   const [selectedShotZone, setSelectedShotZone] = useState('Cover');
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [showNoBallOptions, setShowNoBallOptions] = useState(false);
+  const [activeExtraType, setActiveExtraType] = useState(null); // 'wide', 'noball', 'bye', 'legbye' or null
 
   const currKey = `innings_${match.current_innings || 1}`;
   const inn = match[currKey] || match.innings_1 || { runs: 0, wickets: 0, overs: 0.0 };
@@ -29,10 +29,13 @@ export default function ScorerControl() {
       is_wicket: false,
       shot_zone: selectedShotZone
     });
-    setShowNoBallOptions(false);
+    setActiveExtraType(null);
   };
 
   const crr = inn.overs > 0 ? (inn.runs / (Math.floor(inn.overs) + (inn.overs % 1) * (10 / 6))).toFixed(2) : "0.00";
+
+  // Calculate current over balls sequence for "THIS OVER" bar
+  const currentOverBalls = (match.ball_history || []).slice(0, 8);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-24">
@@ -109,6 +112,42 @@ export default function ScorerControl() {
           </div>
         </div>
 
+        {/* 🏏 "THIS OVER BALLS" Sequence Bar */}
+        <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+          <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">THIS OVER</span>
+          <div className="flex items-center space-x-2 overflow-x-auto">
+            {currentOverBalls.length === 0 ? (
+              <span className="text-xs text-slate-500 font-semibold">Start of over</span>
+            ) : (
+              currentOverBalls.map((b, idx) => {
+                const isW = b.is_wicket;
+                const isSix = b.runs === 6 && !b.extra_type;
+                const isFour = b.runs === 4 && !b.extra_type;
+                const isExtra = !!b.extra_type;
+
+                return (
+                  <span
+                    key={b.id || idx}
+                    className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-heading font-black border transition ${
+                      isW
+                        ? 'bg-red-600 text-white border-red-500'
+                        : isSix
+                        ? 'bg-amber-400 text-black border-amber-300'
+                        : isFour
+                        ? 'bg-[#00D26A] text-black border-[#00FF95]'
+                        : isExtra
+                        ? 'bg-orange-500 text-black border-orange-400'
+                        : 'bg-slate-900 text-white border-slate-800'
+                    }`}
+                  >
+                    {isW ? 'W' : isExtra ? `${b.extra_type === 'noball' ? 'NB' : b.extra_type === 'wide' ? 'WD' : 'B'}${b.runs > 0 ? b.runs : ''}` : b.runs}
+                  </span>
+                );
+              })
+            )}
+          </div>
+        </div>
+
         {/* Current Batters Row */}
         <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
           <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
@@ -143,27 +182,73 @@ export default function ScorerControl() {
           <button onClick={() => setIsWicketModalOpen(true)} className="py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-heading font-black text-lg col-span-2 sm:col-span-1 shadow-lg shadow-red-600/30 active:scale-95 transition">WKT</button>
         </div>
 
-        {/* Extras & No Ball Combo Row */}
+        {/* Extras Row (Wide, No Ball, Bye, Leg Bye Selector) */}
         <div className="space-y-3 pt-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button onClick={() => onScore(0, 'wide')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">WD (Wide)</button>
-            <button onClick={() => setShowNoBallOptions(!showNoBallOptions)} className="py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-black font-extrabold text-xs shadow-md shadow-orange-500/20 active:scale-95 transition">⚡ NB (No Ball + Runs)</button>
-            <button onClick={() => onScore(1, 'bye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">B (Bye)</button>
-            <button onClick={() => onScore(1, 'legbye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800 active:scale-95 transition">LB (Leg Bye)</button>
+            <button
+              onClick={() => setActiveExtraType(activeExtraType === 'wide' ? null : 'wide')}
+              className={`py-3 rounded-xl font-extrabold text-xs border transition ${
+                activeExtraType === 'wide'
+                  ? 'bg-amber-400 text-black border-amber-300 shadow-md'
+                  : 'bg-slate-900/90 text-amber-300 border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              WD (Wide + Runs)
+            </button>
+            <button
+              onClick={() => setActiveExtraType(activeExtraType === 'noball' ? null : 'noball')}
+              className={`py-3 rounded-xl font-extrabold text-xs border transition ${
+                activeExtraType === 'noball'
+                  ? 'bg-orange-500 text-black border-orange-400 shadow-md'
+                  : 'bg-slate-900/90 text-orange-400 border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              NB (No Ball + Runs)
+            </button>
+            <button
+              onClick={() => setActiveExtraType(activeExtraType === 'bye' ? null : 'bye')}
+              className={`py-3 rounded-xl font-extrabold text-xs border transition ${
+                activeExtraType === 'bye'
+                  ? 'bg-indigo-500 text-white border-indigo-400 shadow-md'
+                  : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              B (Bye + Runs)
+            </button>
+            <button
+              onClick={() => setActiveExtraType(activeExtraType === 'legbye' ? null : 'legbye')}
+              className={`py-3 rounded-xl font-extrabold text-xs border transition ${
+                activeExtraType === 'legbye'
+                  ? 'bg-purple-500 text-white border-purple-400 shadow-md'
+                  : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              LB (Leg Bye + Runs)
+            </button>
           </div>
 
-          {/* No-Ball Options Sub-Row: No Ball + 0, No Ball + 1, No Ball + 2, No Ball + 4, No Ball + 6 */}
-          {showNoBallOptions && (
-            <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/30 space-y-2 animate-fadeIn">
-              <span className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider block">
-                Select Runs Scored Off No-Ball (1 Extra Penalty Added Automatically)
-              </span>
-              <div className="grid grid-cols-5 gap-2">
-                <button onClick={() => onScore(0, 'noball')} className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-orange-300 font-extrabold text-xs border border-slate-800">NB + 0</button>
-                <button onClick={() => onScore(1, 'noball')} className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-orange-300 font-extrabold text-xs border border-slate-800">NB + 1</button>
-                <button onClick={() => onScore(2, 'noball')} className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-orange-300 font-extrabold text-xs border border-slate-800">NB + 2</button>
-                <button onClick={() => onScore(4, 'noball')} className="py-2.5 rounded-xl bg-orange-500 text-black font-extrabold text-xs shadow-md">NB + 4 🚀</button>
-                <button onClick={() => onScore(6, 'noball')} className="py-2.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs shadow-md">NB + 6 💥</button>
+          {/* Sub-Row for selecting number of runs for ANY extra (0, 1, 2, 3, 4, 6) */}
+          {activeExtraType && (
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400">
+                  Select Runs Scored for {activeExtraType.toUpperCase()}
+                </span>
+                <button onClick={() => setActiveExtraType(null)} className="text-[10px] text-slate-500 hover:text-white font-bold">
+                  Close ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-6 gap-2">
+                {[0, 1, 2, 3, 4, 6].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => onScore(r, activeExtraType)}
+                    className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-heading font-black text-sm border border-slate-800 hover:border-amber-400 transition"
+                  >
+                    +{r}
+                  </button>
+                ))}
               </div>
             </div>
           )}
