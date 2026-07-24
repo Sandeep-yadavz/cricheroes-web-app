@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { X, ShieldCheck, UserCheck, Lock, Mail, User, AlertCircle } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
@@ -49,9 +50,9 @@ export default function AuthModal({ isOpen, onClose }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-      <div className="w-full max-w-md my-auto bg-[#121824] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto relative z-[10000]">
+  const modalContent = (
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div className="w-full max-w-md my-auto bg-[#121824] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto relative z-[1000000]">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -185,4 +186,6 @@ export default function AuthModal({ isOpen, onClose }) {
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(modalContent, document.body);
 }

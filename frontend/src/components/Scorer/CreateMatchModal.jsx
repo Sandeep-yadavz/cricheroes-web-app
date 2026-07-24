@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { X, PlusCircle, Trophy, Flame } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
@@ -65,9 +66,9 @@ export default function CreateMatchModal({ isOpen, onClose }) {
     setActiveTab('scorer');
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-fadeIn">
-      <div className="w-full max-w-md my-auto bg-[#121824] border-2 border-[#00D26A]/40 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto relative z-[10000]">
+  const modalContent = (
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-fadeIn">
+      <div className="w-full max-w-md my-auto bg-[#121824] border-2 border-[#00D26A] rounded-3xl p-6 shadow-[0_0_50px_rgba(0,210,106,0.3)] space-y-5 max-h-[90vh] overflow-y-auto relative z-[1000000]">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-[#121824] z-10 pt-1">
@@ -183,4 +184,7 @@ export default function CreateMatchModal({ isOpen, onClose }) {
       </div>
     </div>
   );
+
+  // Render via React Portal directly into document.body to break out of all parent stacking contexts
+  return ReactDOM.createPortal(modalContent, document.body);
 }
