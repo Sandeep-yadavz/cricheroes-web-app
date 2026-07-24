@@ -42,7 +42,7 @@ const INITIAL_TOURNAMENTS = [
     id: "tour1",
     name: "Grassroots Champions Trophy 2026",
     admin_id: "u2",
-    admin_name: "League Director Amit",
+    admin_name: "Amit Sharma",
     format: "T20",
     ball_type: "Leather",
     overs_limit: 20,
@@ -63,7 +63,7 @@ const INITIAL_MATCH = {
   toss_decision: "bat",
   current_innings: 1,
   assigned_scorer_id: "u1",
-  assigned_scorer_name: "Official Scorer Rohit",
+  assigned_scorer_name: "Rohit Varma",
   fielding_positions: INITIAL_FIELDERS,
   innings_1: {
     batting_team_id: "t1",
@@ -111,8 +111,10 @@ export function CricketProvider({ children }) {
   const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
   const [currentUser, setCurrentUser] = useState({
     id: "u1",
-    name: "Official Scorer Rohit",
-    email: "scorer@cricheroes.in",
+    name: "Rohit Varma",
+    email: "scorer@gmail.com",
+    phone_number: "+91 9876543210",
+    age: 26,
     token: "token_scorer_secret_123"
   });
 
@@ -230,21 +232,25 @@ export function CricketProvider({ children }) {
         return res.user;
       }
     } catch (e) {}
-    const fakeUser = { id: "u1", name: "Official Scorer Rohit", email };
+    const fakeUser = { id: "u1", name: "Rohit Varma", email, phone_number: "+91 9876543210", age: 26 };
     setCurrentUser(fakeUser);
     return fakeUser;
   };
 
-  const handleRegister = async (name, email, password) => {
+  const handleRegister = async ({ name, email, phone_number, age, password }) => {
     try {
-      const res = await apiClient.post('/api/auth/register', { name, email, password });
+      const res = await apiClient.post('/api/auth/register', { name, email, phone_number, age: parseInt(age), password });
       if (res && res.user) {
         setCurrentUser(res.user);
         apiClient.setToken(res.token);
         return res.user;
       }
-    } catch (e) {}
-    const newU = { id: `u_${Date.now()}`, name, email };
+    } catch (e) {
+      if (e.response && e.response.data && e.response.data.detail) {
+        throw new Error(e.response.data.detail);
+      }
+    }
+    const newU = { id: `u_${Date.now()}`, name, email, phone_number, age: parseInt(age) };
     setCurrentUser(newU);
     return newU;
   };

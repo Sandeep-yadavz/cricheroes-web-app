@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, Mail, User, AlertCircle, ArrowRight, CheckCircle2, Flame, Award, Trophy } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, User, Phone, Calendar, AlertCircle, ArrowRight, Flame } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
 export default function LoginPage() {
   const { handleLogin, handleRegister, currentUser, handleLogout, setActiveTab } = useCricket();
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,13 +20,29 @@ export default function LoginPage() {
 
     try {
       if (isRegisterMode) {
-        await handleRegister(name, email, password);
+        if (!email.toLowerCase().includes('@gmail.com') && !email.toLowerCase().includes('@')) {
+          throw new Error("Please enter a valid Gmail address (e.g. user@gmail.com)");
+        }
+        if (phoneNumber.length < 10) {
+          throw new Error("Please enter a valid 10-digit mobile phone number");
+        }
+        if (parseInt(age) < 10 || parseInt(age) > 90) {
+          throw new Error("Please enter a valid age between 10 and 90");
+        }
+
+        await handleRegister({
+          name,
+          email,
+          phone_number: phoneNumber,
+          age: parseInt(age),
+          password
+        });
       } else {
         await handleLogin(email, password);
       }
       setActiveTab('match_center');
     } catch (err) {
-      setError(err.message || "Authentication failed. Please check credentials.");
+      setError(err.message || "Authentication failed. Please verify your details.");
     } finally {
       setLoading(false);
     }
@@ -34,9 +52,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (userType === 'USER1') {
-        await handleLogin('scorer@cricheroes.in', 'scorer123');
+        await handleLogin('scorer@gmail.com', 'scorer123');
       } else {
-        await handleLogin('organizer@cricheroes.in', 'organizer123');
+        await handleLogin('organizer@gmail.com', 'organizer123');
       }
       setActiveTab('match_center');
     } catch (err) {
@@ -55,23 +73,23 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider block">CURRENTLY SIGNED IN</span>
+            <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider block">AUTHENTICATED MEMBER</span>
             <h2 className="text-2xl font-heading font-black text-white mt-1">{currentUser.name}</h2>
-            <p className="text-xs text-slate-400 mt-1">{currentUser.email}</p>
+            <p className="text-xs text-slate-400 mt-1">{currentUser.email} • {currentUser.phone_number || "+91 9876543210"} • Age: {currentUser.age || 26}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-xs">
             <p className="text-slate-400 font-semibold">
-              Create a tournament to become its <strong>Organizer</strong>, or get assigned as <strong>Official Scorer</strong> for any match!
+              Create a tournament to become its <strong>Organizer</strong>, or get appointed as <strong>Official Match Scorer</strong>!
             </p>
           </div>
 
           <div className="flex items-center space-x-3 pt-2">
             <button
-              onClick={() => setActiveTab('scorer')}
+              onClick={() => setActiveTab('match_center')}
               className="flex-1 py-3.5 rounded-xl bg-[#00D26A] text-black font-extrabold text-xs shadow-lg shadow-[#00D26A]/20 hover:bg-[#00FF95] transition"
             >
-              Go to Scorer Console
+              Enter Match Center
             </button>
             <button
               onClick={handleLogout}
@@ -86,21 +104,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto py-8 pb-20 space-y-6">
+    <div className="max-w-md mx-auto py-6 pb-20 space-y-5">
       
-      {/* Top Banner */}
+      {/* Header */}
       <div className="glass-card rounded-3xl p-6 border border-slate-800 text-center space-y-2">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D26A] to-[#00FF95] text-black shadow-lg shadow-[#00D26A]/20 mb-1">
           <Flame className="w-7 h-7 font-black" />
         </div>
-        <h2 className="text-2xl font-heading font-black text-white">CricHeroes Member Access</h2>
-        <p className="text-xs text-slate-400">Sign in to organize tournaments, record live scores &amp; view stats</p>
+        <h2 className="text-2xl font-heading font-black text-white">CricHeroes Account Access</h2>
+        <p className="text-xs text-slate-400">Database Connected Grassroots Authentication</p>
       </div>
 
       {/* Auth Card */}
-      <div className="glass-card rounded-3xl p-8 border border-slate-800 space-y-6 shadow-2xl">
+      <div className="glass-card rounded-3xl p-7 border border-slate-800 space-y-5 shadow-2xl">
         
-        {/* Sign In / Sign Up Mode Switcher Tabs */}
+        {/* Toggle Mode */}
         <div className="flex items-center space-x-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
           <button
             onClick={() => { setIsRegisterMode(false); setError(''); }}
@@ -116,7 +134,7 @@ export default function LoginPage() {
               isRegisterMode ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Create Account
+            Register Account
           </button>
         </div>
 
@@ -127,42 +145,76 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Form Fields */}
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           {isRegisterMode && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Full Name</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Rohit Varma"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
-                />
+            <>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rohit Varma"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Mobile Phone Number</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+91 98765 43210"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Age</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="number"
+                    required
+                    min="10"
+                    max="90"
+                    placeholder="e.g. 24"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Email Address</label>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Gmail Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
               <input
                 type="email"
                 required
-                placeholder="scorer@cricheroes.in"
+                placeholder="rohit.varma@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Password</label>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
               <input
@@ -171,7 +223,7 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
               />
             </div>
           </div>
@@ -179,30 +231,30 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 hover:opacity-95 transition flex items-center justify-center space-x-2"
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 hover:opacity-95 transition flex items-center justify-center space-x-2 mt-2"
           >
-            <span>{loading ? "Authenticating..." : (isRegisterMode ? "Register Account" : "Sign In")}</span>
+            <span>{loading ? "Connecting Database..." : (isRegisterMode ? "Register & Connect Profile" : "Sign In to CricHeroes")}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Fast Demo Accounts */}
-        <div className="pt-4 border-t border-slate-800 space-y-3">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block text-center">
-            Or Click to Sign In as Pre-Verified User
+        {/* Demo Fast Login */}
+        <div className="pt-3 border-t border-slate-800 space-y-2">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">
+            Or Click to Sign In as Verified Account
           </span>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleDemoLogin('USER1')}
-              className="py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5"
+              className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1"
             >
-              <span>👤 Rohit Varma</span>
+              <span>👤 Rohit (Age 26)</span>
             </button>
             <button
               onClick={() => handleDemoLogin('USER2')}
-              className="py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5"
+              className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1"
             >
-              <span>👤 Amit Sharma</span>
+              <span>👤 Amit (Age 32)</span>
             </button>
           </div>
         </div>

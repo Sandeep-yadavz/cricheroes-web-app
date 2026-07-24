@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, ShieldCheck, Lock, Mail, User, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, Lock, Mail, User, Phone, Calendar, AlertCircle } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
 export default function AuthModal({ isOpen, onClose }) {
   const { handleLogin, handleRegister } = useCricket();
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +23,13 @@ export default function AuthModal({ isOpen, onClose }) {
 
     try {
       if (isRegisterMode) {
-        await handleRegister(name, email, password);
+        await handleRegister({
+          name,
+          email,
+          phone_number: phoneNumber,
+          age: parseInt(age),
+          password
+        });
       } else {
         await handleLogin(email, password);
       }
@@ -37,9 +45,9 @@ export default function AuthModal({ isOpen, onClose }) {
     setLoading(true);
     try {
       if (accountType === 'USER1') {
-        await handleLogin('scorer@cricheroes.in', 'scorer123');
+        await handleLogin('scorer@gmail.com', 'scorer123');
       } else {
-        await handleLogin('organizer@cricheroes.in', 'organizer123');
+        await handleLogin('organizer@gmail.com', 'organizer123');
       }
       onClose();
     } catch (err) {
@@ -51,10 +59,10 @@ export default function AuthModal({ isOpen, onClose }) {
 
   const modalContent = (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-      <div className="w-full max-w-md my-auto bg-[#121824] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto relative z-[1000000]">
+      <div className="w-full max-w-md my-auto bg-[#121824] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto relative z-[1000000]">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-[#00D26A]/20 text-[#00D26A] flex items-center justify-center font-bold">
               <ShieldCheck className="w-6 h-6" />
@@ -63,7 +71,7 @@ export default function AuthModal({ isOpen, onClose }) {
               <h3 className="text-lg font-heading font-bold text-white">
                 {isRegisterMode ? "Create CricHeroes Account" : "Sign In to CricHeroes"}
               </h3>
-              <p className="text-xs text-slate-400">Universal Grassroots Account Access</p>
+              <p className="text-xs text-slate-400">Grassroots Profile Authentication</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg">
@@ -79,32 +87,66 @@ export default function AuthModal({ isOpen, onClose }) {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {isRegisterMode && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Full Name</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Rohit Varma"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
-                />
+            <>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rohit Varma"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Mobile Phone Number</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+91 98765 43210"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Age</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="number"
+                    required
+                    min="10"
+                    max="90"
+                    placeholder="e.g. 26"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Email Address</label>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Gmail Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
                 type="email"
                 required
-                placeholder="scorer@cricheroes.in"
+                placeholder="scorer@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-[#00D26A]"
@@ -130,16 +172,16 @@ export default function AuthModal({ isOpen, onClose }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-[#00D26A] hover:bg-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 transition"
+            className="w-full py-3 rounded-xl bg-[#00D26A] hover:bg-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 transition mt-2"
           >
-            {loading ? "Authenticating..." : (isRegisterMode ? "Create Account & Sign In" : "Sign In")}
+            {loading ? "Authenticating..." : (isRegisterMode ? "Register Account" : "Sign In")}
           </button>
         </form>
 
         {/* Demo Fast Login Buttons */}
         <div className="pt-2 border-t border-slate-800 space-y-2">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-            Or Quick Sign In as Pre-Verified User
+            Or Quick Sign In as Verified Account
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button

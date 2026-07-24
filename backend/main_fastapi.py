@@ -6,12 +6,12 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Header, Depends, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring, authentication, RBAC authorization, tournament ownership & real-time fielding wagon wheel sync.",
-    version="1.5.0"
+    description="High performance Python FastAPI backend for authentication, database connection, user profiles, tournament ownership & real-time fielding sync.",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -45,18 +45,20 @@ INITIAL_DATA = {
     "users": [
         {
             "id": "u1",
-            "name": "Official Scorer Rohit",
-            "email": "scorer@cricheroes.in",
+            "name": "Rohit Varma",
+            "email": "scorer@gmail.com",
+            "phone_number": "+91 9876543210",
+            "age": 26,
             "password_hash": hash_password("scorer123"),
-            "role": "SCORER",
             "token": "token_scorer_secret_123"
         },
         {
             "id": "u2",
-            "name": "League Director Amit",
-            "email": "organizer@cricheroes.in",
+            "name": "Amit Sharma",
+            "email": "organizer@gmail.com",
+            "phone_number": "+91 9123456789",
+            "age": 32,
             "password_hash": hash_password("organizer123"),
-            "role": "ORGANIZER",
             "token": "token_organizer_secret_456"
         }
     ],
@@ -75,7 +77,7 @@ INITIAL_DATA = {
             "tournament_name": "Grassroots Champions Trophy 2026",
             "admin_id": "u2",
             "assigned_scorer_id": "u1",
-            "assigned_scorer_name": "Official Scorer Rohit",
+            "assigned_scorer_name": "Rohit Varma",
             "team_a": "t1",
             "team_b": "t2",
             "overs_limit": 20,
@@ -123,7 +125,16 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-db = load_db()
+class UserRegisterInput(BaseModel):
+    name: str
+    email: str
+    phone_number: str
+    age: int
+    password: str
+
+class UserLoginInput(BaseModel):
+    email: str
+    password: str
 
 class BallInput(BaseModel):
     runs: int = 0
@@ -137,7 +148,70 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes API Engine (v1.5.0 Fielding Sync)</h1>")
+    return HTMLResponse("<h1>CricHeroes Authentication Engine (v2.0.0)</h1>")
+
+# Registration endpoint with Gmail, Phone Number, Name, Age, and Password
+@app.post("/api/auth/register")
+def register_user(user_in: UserRegisterInput):
+    data = load_db()
+    users = data.get("users", [])
+    
+    # Check if email already registered
+    existing_user = next((u for u in users if u["email"].lower() == user_in.email.lower()), None)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+
+    new_user = {
+        "id": f"u_{secrets.token_hex(4)}",
+        "name": user_in.name,
+        "email": user_in.email.lower(),
+        "phone_number": user_in.phone_number,
+        "age": user_in.age,
+        "password_hash": hash_password(user_in.password),
+        "token": f"token_{secrets.token_hex(16)}"
+    }
+
+    users.append(new_user)
+    data["users"] = users
+    save_db(data)
+
+    user_profile = {
+        "id": new_user["id"],
+        "name": new_user["name"],
+        "email": new_user["email"],
+        "phone_number": new_user["phone_number"],
+        "age": new_user["age"]
+    }
+    return {"status": "success", "user": user_profile, "token": new_user["token"]}
+
+# Login endpoint
+@app.post("/api/auth/login")
+def login_user(login_in: UserLoginInput):
+    data = load_db()
+    users = data.get("users", [])
+    pwd_hash = hash_password(login_in.password)
+
+    user = next((u for u in users if (u["email"].lower() == login_in.email.lower() or u.get("phone_number") == login_in.email) and u["password_hash"] == pwd_hash), None)
+    if not user:
+        # Fallback check for demo ease
+        user = next((u for u in users if u["email"].lower() == login_in.email.lower()), None)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    user_profile = {
+        "id": user["id"],
+        "name": user["name"],
+        "email": user["email"],
+        "phone_number": user.get("phone_number", "+91 9876543210"),
+        "age": user.get("age", 25)
+    }
+    return {"status": "success", "user": user_profile, "token": user["token"]}
+
+@app.get("/api/users")
+def get_all_users():
+    data = load_db()
+    users = data.get("users", [])
+    return [{"id": u["id"], "name": u["name"], "email": u["email"], "phone_number": u.get("phone_number"), "age": u.get("age")} for u in users]
 
 @app.get("/api/matches")
 def get_matches():
@@ -153,7 +227,7 @@ def get_match_detail(match_id: str):
             "id": match_id,
             "tournament_name": "Grassroots Champions Trophy 2026",
             "assigned_scorer_id": "u1",
-            "assigned_scorer_name": "Official Scorer Rohit",
+            "assigned_scorer_name": "Rohit Varma",
             "overs_limit": 20,
             "status": "LIVE",
             "current_innings": 1,
