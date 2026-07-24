@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, UserCheck, LogOut, Lock, Sparkles } from 'lucide-react';
+import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, LogOut, Lock, Sparkles } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import CreateMatchModal from '../Scorer/CreateMatchModal';
 import AuthModal from '../Auth/AuthModal';
@@ -9,10 +9,8 @@ export default function Navbar() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  const currKey = `innings_${match.current_innings}`;
-  const inn = match[currKey] || match.innings_1;
-  const batTeam = teams[inn.batting_team_id] || { short_name: "MUM" };
-  const bowlTeam = teams[inn.bowling_team_id] || { short_name: "DEL" };
+  // Scorer Deck Tab visibility check: ONLY visible for Assigned Scorer or Tournament Admin!
+  const isScorerForMatch = currentUser && (currentUser.id === match.assigned_scorer_id || currentUser.id === match.admin_id);
 
   return (
     <header className="sticky top-0 z-40 bg-[#0B0E14]/90 backdrop-blur-md border-b border-slate-800">
@@ -50,17 +48,20 @@ export default function Navbar() {
               <span>Match Center</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('scorer')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'scorer'
-                  ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span>Scorer Deck</span>
-            </button>
+            {/* Scorer Deck: ONLY visible if logged in user is Assigned Scorer or Tournament Admin */}
+            {isScorerForMatch && (
+              <button
+                onClick={() => setActiveTab('scorer')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === 'scorer'
+                    ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Scorer Deck</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('tournaments')}
@@ -116,9 +117,7 @@ export default function Navbar() {
             {currentUser ? (
               <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <span className="text-[#00D26A]">
-                    {currentUser.role === 'SCORER' ? '🛡️' : (currentUser.role === 'ORGANIZER' ? '🏆' : '🏏')}
-                  </span>
+                  <span className="text-[#00D26A]">👤</span>
                   {currentUser.name}
                 </span>
                 <button
