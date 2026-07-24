@@ -1,274 +1,116 @@
 import React, { useState } from 'react';
-import { RotateCcw, ArrowRightLeft, Target, AlertTriangle, ChevronRight, UserCheck, Trophy } from 'lucide-react';
+import { RotateCcw, AlertTriangle, UserCheck, Flame, Shield, ArrowRightLeft, Volume2, Target, Trophy, Award } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import WicketModal from './WicketModal';
 import MatchWinnerModal from './MatchWinnerModal';
+import DraggableFieldingWagonWheel from './DraggableFieldingWagonWheel';
 
 export default function ScorerControl() {
-  const {
-    match,
-    players,
-    teams,
-    handleScoreBall,
-    handleUndoBall,
-    swapStrikers,
-    setIsWicketModalOpen
-  } = useCricket();
-
-  const [shotZone, setShotZone] = useState('Cover');
-  const [extraMode, setExtraMode] = useState(null); // 'wide', 'noball', 'bye', 'legbye'
-  const [isWinnerOpen, setIsWinnerOpen] = useState(false);
+  const { match, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser } = useCricket();
+  const [selectedShotZone, setSelectedShotZone] = useState('Cover');
+  const [showWagonWheel, setShowWagonWheel] = useState(true);
 
   const currKey = `innings_${match.current_innings}`;
-  const inn = match[currKey];
-  const batTeam = teams[inn.batting_team_id] || { name: "Batting Team", logo: "🏏" };
+  const inn = match[currKey] || match.innings_1;
+  const strikerStat = inn.batting_stats.find(b => b.player_id === inn.striker_id) || { name: "Rohit Varma", runs: 68, balls: 42 };
+  const nonStrikerStat = inn.batting_stats.find(b => b.player_id === inn.non_striker_id) || { name: "Virat Saxena", runs: 45, balls: 31 };
 
-  const striker = players[inn.striker_id] || { name: "Rohit Varma" };
-  const nonStriker = players[inn.non_striker_id] || { name: "Virat Saxena" };
-  const bowler = players[inn.current_bowler_id] || { name: "Rashid Khan" };
-
-  const strikerStat = inn.batting_stats.find(b => b.player_id === inn.striker_id) || { runs: 72, balls: 44, fours: 7, sixes: 4, sr: 163.6 };
-  const nonStrikerStat = inn.batting_stats.find(b => b.player_id === inn.non_striker_id) || { runs: 45, balls: 31, fours: 5, sixes: 1, sr: 145.2 };
-  const bowlerStat = inn.bowling_stats.find(bw => bw.player_id === inn.current_bowler_id) || { overs: 3.5, runs: 32, wickets: 2, economy: 8.3 };
-
-  const shotZones = ['Cover', 'Long On', 'Mid Off', 'Fine Leg', 'Square Leg', 'Point'];
-
-  const onScoreClick = (runs) => {
+  const onScore = (runs, extra_type = null) => {
     handleScoreBall({
-      runs: runs,
-      extra_type: extraMode,
+      runs,
+      extra_type,
       is_wicket: false,
-      shot_zone: shotZone
+      shot_zone: selectedShotZone
     });
-    setExtraMode(null);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div className="max-w-4xl mx-auto space-y-6 pb-24">
       
-      {/* Top Match Header Card */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-800">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div className="flex items-center space-x-3">
-            <span className="text-3xl">{batTeam.logo}</span>
-            <div>
-              <h2 className="text-xl font-heading font-extrabold text-white">{batTeam.name}</h2>
-              <p className="text-xs text-slate-400 font-medium">Innings {match.current_innings} • {match.tournament_name}</p>
-            </div>
+      {/* Top Banner Header */}
+      <div className="glass-card rounded-3xl p-6 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center space-x-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#00D26A] to-[#00FF95] text-black flex items-center justify-center font-bold shadow-lg shadow-[#00D26A]/20">
+            <Shield className="w-8 h-8" />
           </div>
-
-          <div className="text-right flex md:flex-col items-center md:items-end justify-between w-full md:w-auto">
-            <div className="text-3xl font-heading font-black text-white">
-              {inn.runs}<span className="text-slate-400">/</span><span className="text-[#00D26A]">{inn.wickets}</span>
-            </div>
-            <p className="text-xs text-slate-400 font-semibold">
-              {inn.overs} <span className="text-slate-500">/ {match.overs_limit} Overs</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Current Over Ball Chips Ticker & Action Buttons */}
-        <div className="pt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center space-x-2 overflow-x-auto py-1">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">This Over:</span>
-            {match.ball_history.slice(0, 6).map((b, idx) => (
-              <span
-                key={idx}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center border shadow-sm ${
-                  b.type === 'SIX'
-                    ? 'bg-[#00D26A] text-black border-[#00D26A] shadow-md shadow-[#00D26A]/20'
-                    : b.type === 'FOUR'
-                    ? 'bg-amber-400 text-black border-amber-300'
-                    : b.type === 'WICKET'
-                    ? 'bg-red-500 text-white border-red-400'
-                    : 'bg-slate-800 text-slate-200 border-slate-700'
-                }`}
-              >
-                {b.runs}
-              </span>
-            ))}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setIsWinnerOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-400 text-black text-xs font-extrabold transition shadow-md shadow-amber-400/20"
-            >
-              <Trophy className="w-3.5 h-3.5" />
-              <span>End Match</span>
-            </button>
-
-            <button
-              onClick={handleUndoBall}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition border border-slate-700"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Undo Ball</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Players On Field (Striker, Non-Striker & Bowler Card) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        
-        {/* Batters Card */}
-        <div className="glass-panel rounded-2xl p-4 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Batters</span>
-            <button
-              onClick={swapStrikers}
-              className="flex items-center space-x-1 text-xs font-semibold text-[#00D26A] hover:underline"
-            >
-              <ArrowRightLeft className="w-3.5 h-3.5" />
-              <span>Swap Striker</span>
-            </button>
-          </div>
-
-          {/* Striker */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#00D26A]/10 border border-[#00D26A]/30">
-            <div className="flex items-center space-x-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#00D26A] animate-pulse"></span>
-              <div>
-                <p className="text-sm font-bold text-white flex items-center gap-1.5">
-                  {striker.name} <span className="text-[10px] bg-[#00D26A] text-black font-extrabold px-1.5 py-0.5 rounded">STRIKER</span>
-                </p>
-                <p className="text-xs text-slate-400">SR: {strikerStat.sr}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-lg font-bold text-white">{strikerStat.runs}</span>
-              <span className="text-xs text-slate-400 font-medium"> ({strikerStat.balls}b, {strikerStat.fours}x4, {strikerStat.sixes}x6)</span>
-            </div>
-          </div>
-
-          {/* Non-Striker */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 opacity-80">
-            <div className="flex items-center space-x-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
-              <div>
-                <p className="text-sm font-bold text-slate-300">{nonStriker.name}</p>
-                <p className="text-xs text-slate-400">SR: {nonStrikerStat.sr}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-lg font-bold text-slate-200">{nonStrikerStat.runs}</span>
-              <span className="text-xs text-slate-400 font-medium"> ({nonStrikerStat.balls}b)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bowler Card */}
-        <div className="glass-panel rounded-2xl p-4 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Bowler</span>
-            <span className="text-xs text-[#00D26A] font-semibold">Over in progress</span>
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white text-sm">
-                🎯
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">{bowler.name}</p>
-                <p className="text-xs text-slate-400">Econ: {bowlerStat.economy}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-lg font-bold text-red-400">{bowlerStat.wickets}</span>
-              <span className="text-[#00D26A] font-bold text-lg"> / {bowlerStat.runs}</span>
-              <p className="text-xs text-slate-400">({bowlerStat.overs} ov)</p>
-            </div>
-          </div>
-
-          {/* Shot Zone Selector for Wagon Wheel */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              Shot Direction (Wagon Wheel)
-            </label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {shotZones.map((zone) => (
-                <button
-                  key={zone}
-                  onClick={() => setShotZone(zone)}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition border ${
-                    shotZone === zone
-                      ? 'bg-[#00D26A]/20 text-[#00D26A] border-[#00D26A]'
-                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  {zone}
-                </button>
-              ))}
-            </div>
+            <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider">Official Scorer Console</span>
+            <h2 className="text-2xl font-heading font-black text-white">Ball-by-Ball Live Scoring</h2>
+            <p className="text-xs text-slate-400 font-semibold">Match ID: {match.id} • {match.tournament_name}</p>
           </div>
         </div>
 
-      </div>
-
-      {/* Extras Selector Mode */}
-      <div className="glass-panel rounded-2xl p-4 border border-slate-800 space-y-3">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Extras &amp; Special Events</span>
-        <div className="grid grid-cols-4 gap-2">
-          {['wide', 'noball', 'bye', 'legbye'].map((ext) => (
-            <button
-              key={ext}
-              onClick={() => setExtraMode(extraMode === ext ? null : ext)}
-              className={`py-2 px-3 rounded-xl text-xs font-extrabold uppercase transition border ${
-                extraMode === ext
-                  ? 'bg-amber-400 text-black border-amber-300 shadow-md shadow-amber-400/20'
-                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
-              }`}
-            >
-              {ext} {extraMode === ext ? '✓' : ''}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Primary Touch Scoring Deck */}
-      <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Scoring Console</span>
-          {extraMode && (
-            <span className="text-xs font-bold text-amber-400 animate-pulse">
-              [ {extraMode.toUpperCase()} MODE ACTIVE - Tap runs to record ]
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
-          {[0, 1, 2, 3, 4, 6].map((num) => (
-            <button
-              key={num}
-              onClick={() => onScoreClick(num)}
-              className={`score-btn py-5 rounded-2xl font-heading font-black text-2xl border shadow-lg transition-all ${
-                num === 6
-                  ? 'bg-gradient-to-tr from-[#00D26A] to-[#00FF95] text-black border-[#00D26A] shadow-[#00D26A]/30 hover:scale-105'
-                  : num === 4
-                  ? 'bg-gradient-to-tr from-amber-400 to-amber-300 text-black border-amber-400 shadow-amber-400/30 hover:scale-105'
-                  : num === 0
-                  ? 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
-                  : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              {num === 0 ? 'DOT' : num}
-            </button>
-          ))}
-
-          {/* Wicket Button */}
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => setIsWicketModalOpen(true)}
-            className="score-btn col-span-2 sm:col-span-1 py-5 rounded-2xl bg-gradient-to-tr from-red-600 to-red-500 text-white font-heading font-black text-xl border border-red-400 shadow-lg shadow-red-500/30 hover:scale-105"
+            onClick={handleUndoBall}
+            className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-800 transition"
           >
-            WKT
+            <RotateCcw className="w-4 h-4 text-amber-400" />
+            <span>Undo Ball</span>
+          </button>
+          <button
+            onClick={() => setIsWinnerModalOpen(true)}
+            className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-lg shadow-amber-500/20 transition"
+          >
+            <Trophy className="w-4 h-4" />
+            <span>End Match</span>
           </button>
         </div>
       </div>
 
+      {/* Main Scorecard Header */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="glass-card rounded-2xl p-4 border border-slate-800 space-y-2">
+          <span className="text-xs font-bold text-slate-400 uppercase">On Strike (Batter)</span>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-heading font-bold text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#00D26A] animate-pulse"></span>
+              {strikerStat.name} *
+            </h3>
+            <span className="text-lg font-heading font-black text-[#00D26A]">{strikerStat.runs} <span className="text-xs text-slate-400">({strikerStat.balls}b)</span></span>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-2xl p-4 border border-slate-800 space-y-2">
+          <span className="text-xs font-bold text-slate-400 uppercase">Non-Striker</span>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-heading font-bold text-slate-300">{nonStrikerStat.name}</h3>
+            <span className="text-lg font-heading font-black text-slate-300">{nonStrikerStat.runs} <span className="text-xs text-slate-400">({nonStrikerStat.balls}b)</span></span>
+          </div>
+        </div>
+      </div>
+
+      {/* Touch Run Scoring Deck */}
+      <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-5">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="font-heading font-extrabold text-white text-base">Touch Score Keypad</h3>
+          <span className="text-xs font-bold text-slate-400">Tap runs or extras to score</span>
+        </div>
+
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
+          <button onClick={() => onScore(0)} className="py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-heading font-black text-xl border border-slate-800 shadow-md">0</button>
+          <button onClick={() => onScore(1)} className="py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-heading font-black text-xl border border-slate-800 shadow-md">1</button>
+          <button onClick={() => onScore(2)} className="py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-heading font-black text-xl border border-slate-800 shadow-md">2</button>
+          <button onClick={() => onScore(3)} className="py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-heading font-black text-xl border border-slate-800 shadow-md">3</button>
+          <button onClick={() => onScore(4)} className="py-4 rounded-2xl bg-gradient-to-tr from-[#00D26A] to-[#00FF95] text-black font-heading font-black text-2xl shadow-lg shadow-[#00D26A]/20">4</button>
+          <button onClick={() => onScore(6)} className="py-4 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-300 text-black font-heading font-black text-2xl shadow-lg shadow-amber-400/20">6</button>
+          <button onClick={() => setIsWicketModalOpen(true)} className="py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-heading font-black text-lg col-span-2 sm:col-span-1 shadow-lg shadow-red-600/30">WKT</button>
+        </div>
+
+        {/* Extras Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          <button onClick={() => onScore(0, 'wide')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 font-extrabold text-xs border border-slate-800">WD (Wide)</button>
+          <button onClick={() => onScore(0, 'noball')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-orange-400 font-extrabold text-xs border border-slate-800">NB (No Ball)</button>
+          <button onClick={() => onScore(1, 'bye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800">B (Bye)</button>
+          <button onClick={() => onScore(1, 'legbye')} className="py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-extrabold text-xs border border-slate-800">LB (Leg Bye)</button>
+        </div>
+      </div>
+
+      {/* Draggable Wagon Wheel & Fielder Placement Widget */}
+      <DraggableFieldingWagonWheel onZoneSelect={(zone) => setSelectedShotZone(zone)} selectedZone={selectedShotZone} />
+
       <WicketModal />
-      <MatchWinnerModal isOpen={isWinnerOpen} onClose={() => setIsWinnerOpen(false)} />
+      <MatchWinnerModal isOpen={false} onClose={() => {}} />
     </div>
   );
 }
