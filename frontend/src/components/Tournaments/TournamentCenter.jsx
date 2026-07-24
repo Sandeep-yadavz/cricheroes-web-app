@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Trophy, Award, Flame, Star, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Trophy, Award, ShieldCheck, PlusCircle, Layers } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
+import TournamentBracket from './TournamentBracket';
+import CreateTeamModal from './CreateTeamModal';
 
 export default function TournamentCenter() {
   const { players, teams } = useCricket();
-  const [activeTab, setActiveTab] = useState('points'); // 'points', 'leaderboard'
+  const [activeTab, setActiveTab] = useState('points'); // 'points', 'bracket', 'leaderboard'
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
 
-  // Points Table pre-populated with exact grassroots league standings
   const standings = [
     { team_id: "t1", name: "Mumbai Strikers", logo: "🔥", p: 3, w: 2, l: 1, t: 0, pts: 4, nrr: "+0.852" },
     { team_id: "t2", name: "Delhi Dynamites", logo: "⚡", p: 3, w: 2, l: 1, t: 0, pts: 4, nrr: "+0.448" },
@@ -34,31 +36,57 @@ export default function TournamentCenter() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => setActiveTab('points')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
-              activeTab === 'points'
-                ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            onClick={() => setIsCreateTeamOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700"
           >
-            Points Table
-          </button>
-          <button
-            onClick={() => setActiveTab('leaderboard')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
-              activeTab === 'leaderboard'
-                ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Leaderboards
+            <PlusCircle className="w-4 h-4 text-[#00D26A]" />
+            <span>Add Custom Team</span>
           </button>
         </div>
       </div>
 
-      {/* Points Table View */}
+      {/* View Switcher Sub-Tabs */}
+      <div className="flex items-center space-x-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('points')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap ${
+            activeTab === 'points'
+              ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Points Table (NRR)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('bracket')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap ${
+            activeTab === 'bracket'
+              ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Knockout Playoff Brackets</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('leaderboard')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap ${
+            activeTab === 'leaderboard'
+              ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          <span>Orange &amp; Purple Caps</span>
+        </button>
+      </div>
+
+      {/* Render Active View */}
       {activeTab === 'points' && (
         <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -107,11 +135,10 @@ export default function TournamentCenter() {
         </div>
       )}
 
-      {/* Leaderboards View (Orange Cap & Purple Cap) */}
+      {activeTab === 'bracket' && <TournamentBracket />}
+
       {activeTab === 'leaderboard' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* Orange Cap (Most Runs) */}
           <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
             <div className="flex items-center space-x-3 border-b border-slate-800 pb-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
@@ -143,7 +170,6 @@ export default function TournamentCenter() {
             </div>
           </div>
 
-          {/* Purple Cap (Most Wickets) */}
           <div className="glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
             <div className="flex items-center space-x-3 border-b border-slate-800 pb-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
@@ -174,10 +200,10 @@ export default function TournamentCenter() {
               ))}
             </div>
           </div>
-
         </div>
       )}
 
+      <CreateTeamModal isOpen={isCreateTeamOpen} onClose={() => setIsCreateTeamOpen(false)} />
     </div>
   );
 }
