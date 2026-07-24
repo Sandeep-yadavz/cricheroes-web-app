@@ -37,6 +37,20 @@ const INITIAL_PLAYERS = {
   p8: { id: "p8", name: "Rashid Khan", team_id: "t2", role: "Bowler", runs: 310, wickets: 52, highest_score: 42, sr: 160.0, avg: 18.2, avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80" }
 };
 
+const INITIAL_TOURNAMENTS = [
+  {
+    id: "tour1",
+    name: "Grassroots Champions Trophy 2026",
+    admin_id: "u2",
+    admin_name: "League Director Amit",
+    format: "T20",
+    ball_type: "Leather",
+    overs_limit: 20,
+    location: "Central Cricket Ground, Mumbai",
+    status: "Ongoing"
+  }
+];
+
 const INITIAL_MATCH = {
   id: "m1",
   tournament_id: "tour1",
@@ -94,18 +108,17 @@ export function CricketProvider({ children }) {
   const [match, setMatch] = useState(INITIAL_MATCH);
   const [teams, setTeams] = useState(INITIAL_TEAMS);
   const [players, setPlayers] = useState(INITIAL_PLAYERS);
+  const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
   const [currentUser, setCurrentUser] = useState({
     id: "u1",
     name: "Official Scorer Rohit",
     email: "scorer@cricheroes.in",
-    role: "SCORER",
     token: "token_scorer_secret_123"
   });
 
   const [isWicketModalOpen, setIsWicketModalOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
 
-  // Real-time Update Fielding Positions Handler
   const handleUpdateFieldingPositions = (newFielders) => {
     setMatch((prev) => ({
       ...prev,
@@ -116,7 +129,6 @@ export function CricketProvider({ children }) {
     }).catch(() => {});
   };
 
-  // Role-Based Permission Check Helper
   const hasPermission = (action) => {
     if (!currentUser) return false;
     if (action === 'SCORE_BALL' || action === 'UNDO_BALL' || action === 'END_MATCH') {
@@ -125,7 +137,6 @@ export function CricketProvider({ children }) {
     return true;
   };
 
-  // Sync with Backend FastAPI on load & polling interval
   useEffect(() => {
     async function loadData() {
       try {
@@ -135,13 +146,9 @@ export function CricketProvider({ children }) {
           if (matchRes.teams) setTeams(matchRes.teams);
           if (matchRes.players) setPlayers(matchRes.players);
         }
-      } catch (err) {
-        console.log("Using initial state fallback");
-      }
+      } catch (err) {}
     }
     loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, shot_zone = "Cover" }) => {
@@ -166,11 +173,8 @@ export function CricketProvider({ children }) {
         setMatch(res.match);
         return;
       }
-    } catch (e) {
-      console.log("Backend offline or fallback");
-    }
+    } catch (e) {}
 
-    // Local state fallback calculation
     setMatch((prevMatch) => {
       const newMatch = JSON.parse(JSON.stringify(prevMatch));
       const currKey = `innings_${newMatch.current_innings}`;
@@ -264,6 +268,8 @@ export function CricketProvider({ children }) {
         setTeams,
         players,
         setPlayers,
+        tournaments,
+        setTournaments,
         currentUser,
         hasPermission,
         handleLogin,

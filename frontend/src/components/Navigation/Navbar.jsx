@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, LogOut, Lock, Sparkles } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
-import CreateMatchModal from '../Scorer/CreateMatchModal';
+import CreateTournamentModal from '../Tournaments/CreateTournamentModal';
 import AuthModal from '../Auth/AuthModal';
 
 export default function Navbar() {
   const { activeTab, setActiveTab, soundEnabled, setSoundEnabled, match, teams, currentUser, handleLogout } = useCricket();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateTourOpen, setIsCreateTourOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   // Scorer Deck Tab visibility check: ONLY visible for Assigned Scorer or Tournament Admin!
@@ -112,7 +112,7 @@ export default function Navbar() {
             </button>
           </nav>
 
-          {/* Controls: Auth User, New Match, Sound */}
+          {/* Controls: Auth User, New Tournament, Sound */}
           <div className="flex items-center space-x-3">
             {currentUser ? (
               <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
@@ -138,12 +138,13 @@ export default function Navbar() {
               </button>
             )}
 
+            {/* Replaced "+ New Match" with "+ New Tournament" */}
             <button
-              onClick={() => setIsCreateOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#00D26A] hover:bg-[#00FF95] text-black font-extrabold text-xs transition shadow-md shadow-[#00D26A]/20"
+              onClick={() => setIsCreateTourOpen(true)}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs transition shadow-md shadow-amber-400/20"
             >
               <PlusCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">New Match</span>
+              <span className="hidden sm:inline">New Tournament</span>
             </button>
 
             <button
@@ -158,7 +159,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      <CreateMatchModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <CreateTournamentModal isOpen={isCreateTourOpen} onClose={() => setIsCreateTourOpen(false)} />
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </header>
   );
