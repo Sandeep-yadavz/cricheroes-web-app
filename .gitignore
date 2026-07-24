@@ -1,0 +1,37 @@
+# Node & Frontend dependencies
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python dependencies & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite & Local persistence
+*.sqlite3
+backend/database.json
+
+# Environment configuration
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

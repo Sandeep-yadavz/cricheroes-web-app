@@ -1,0 +1,78 @@
+                   Database Management - Database Load Report       Mar 20, 2024
+
+
+
+
+Date        : 20-Mar-24
+Database    : surpac database
+Format_file : surpac database.dsc
+
+=====================================================================
+
+
+#############
+Loading Table : collar from file Collar.csv
+#############
+Warning: Value for field hole_id contains illegal lowercase characters
+Warning: Value for field hole_path not in allowed set
+Warning: "max_depth" is not numeric
+Warning: "x" is not numeric
+Warning: "y" is not numeric
+Warning: "z" is not numeric
+Warning: "section" is not numeric
+hole_id,hole_path,max_depth,x,y,z,section
+
+
+      94 records were inserted.
+       0 records were updated.
+       1 records were rejected.
+
+#############
+Loading Table : survey from file Survey.csv
+#############
+Warning: "azimuth" is not numeric
+Warning: "depth" is not numeric
+Warning: "dip" is not numeric
+Warning: Value for field hole_id contains illegal lowercase characters
+azimuth,depth,dip,hole_id
+
+
+     112 records were inserted.
+       0 records were updated.
+       1 records were rejected.
+
+#############
+Loading Table : assay from file Assay.csv
+#############
+Warning: "depth_from" is not numeric
+Warning: "depth_to" is not numeric
+Warning: "gold" is not numeric
+Warning: Value for field hole_id contains illegal lowercase characters
+Warning: Value for field samp_id contains illegal lowercase characters
+depth_from,depth_to,gold,hole_id,samp_id
+
+
+    4813 records were inserted.
+       0 records were updated.
+       1 records were rejected.
+
+	 Performing sample overlap checks
+	 no overlapping samples were found
+
+#############
+Loading Table : geology from file Geology.csv
+#############
+Warning: "depth_from" is not numeric
+Warning: "depth_to" is not numeric
+Warning: Value for field hole_id contains illegal lowercase characters
+depth_from,depth_to,hole_id,rock,samp_id
+
+
+     453 records were inserted.
+       0 records were updated.
+       1 records were rejected.
+
+	 Performing sample overlap checks
+	 no overlapping samples were found
+
+                                                                     Page 1 of 1
