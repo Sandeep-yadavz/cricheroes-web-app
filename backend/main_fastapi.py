@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring, authentication, RBAC authorization, live commentary, NRR calculator, and tournament management.",
-    version="1.3.0"
+    description="High performance Python FastAPI backend for scoring, authentication, RBAC authorization, tournament ownership & scorer assignment.",
+    version="1.4.0"
 )
 
 app.add_middleware(
@@ -44,6 +44,14 @@ INITIAL_DATA = {
             "password_hash": hash_password("organizer123"),
             "role": "ORGANIZER",
             "token": "token_organizer_secret_456"
+        },
+        {
+            "id": "u3",
+            "name": "Player Fan Rahul",
+            "email": "player@cricheroes.in",
+            "password_hash": hash_password("player123"),
+            "role": "PLAYER",
+            "token": "token_player_secret_789"
         }
     ],
     "players": [
@@ -254,6 +262,7 @@ INITIAL_DATA = {
         {
             "id": "tour1",
             "name": "Grassroots Champions Trophy 2026",
+            "admin_id": "u2",
             "format": "T20",
             "ball_type": "Leather",
             "overs_limit": 20,
@@ -272,6 +281,9 @@ INITIAL_DATA = {
             "id": "m1",
             "tournament_id": "tour1",
             "tournament_name": "Grassroots Champions Trophy 2026",
+            "admin_id": "u2",
+            "assigned_scorer_id": "u1",
+            "assigned_scorer_name": "Official Scorer Rohit",
             "team_a": "t1",
             "team_b": "t2",
             "overs_limit": 20,
@@ -346,7 +358,7 @@ def save_db(data):
 
 db = load_db()
 
-# --- Pydantic Data Validation Schemas ---
+# --- Pydantic Schemas ---
 class UserRegister(BaseModel):
     name: str
     email: str
@@ -356,6 +368,10 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+class AssignScorerInput(BaseModel):
+    scorer_id: str
+    scorer_name: str
 
 class BallInput(BaseModel):
     runs: int = 0
@@ -375,79 +391,6 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     user = next((u for u in data.get("users", []) if u.get("token") == token), None)
     return user
 
-def require_scorer_role(authorization: Optional[str] = Header(None)):
-    user = get_current_user(authorization)
-    if authorization and (not user or user.get("role") not in ["SCORER", "ORGANIZER"]):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Authorization Error: Official Scorer or Tournament Organizer credentials required to record match balls."
-        )
-    return user
-
-# --- Helper Functions ---
-def convert_overs_to_balls(overs: float) -> int:
-    completed_overs = int(overs)
-    balls = int(round((overs - completed_overs) * 10))
-    return completed_overs * 6 + balls
-
-def convert_balls_to_overs(total_balls: int) -> float:
-    overs = total_balls // 6
-    balls = total_balls % 6
-    return float(f"{overs}.{balls}")
-
-def calculate_nrr(runs_scored: int, overs_faced: float, runs_conceded: int, overs_bowled: float) -> str:
-    faced_balls = convert_overs_to_balls(overs_faced)
-    bowled_balls = convert_overs_to_balls(overs_bowled)
-    if faced_balls == 0 or bowled_balls == 0:
-        return "+0.000"
-    for_rate = (runs_scored / faced_balls) * 6
-    against_rate = (runs_conceded / bowled_balls) * 6
-    nrr_val = for_rate - against_rate
-    sign = "+" if nrr_val >= 0 else ""
-    return f"{sign}{nrr_val:.3f}"
-
-def create_default_match_structure(match_id: str, team_a: str = "t1", team_b: str = "t2", overs_limit: int = 20):
-    return {
-        "id": match_id,
-        "tournament_id": "tour1",
-        "tournament_name": "Grassroots Champions Trophy 2026",
-        "team_a": team_a,
-        "team_b": team_b,
-        "overs_limit": overs_limit,
-        "status": "LIVE",
-        "toss_winner": team_a,
-        "toss_decision": "bat",
-        "current_innings": 1,
-        "innings_1": {
-            "batting_team_id": team_a,
-            "bowling_team_id": team_b,
-            "runs": 0,
-            "wickets": 0,
-            "overs": 0.0,
-            "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
-            "striker_id": "p1",
-            "non_striker_id": "p2",
-            "current_bowler_id": "p8",
-            "batting_stats": [],
-            "bowling_stats": []
-        },
-        "innings_2": {
-            "batting_team_id": team_b,
-            "bowling_team_id": team_a,
-            "runs": 0,
-            "wickets": 0,
-            "overs": 0.0,
-            "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
-            "striker_id": "p5",
-            "non_striker_id": "p7",
-            "current_bowler_id": "p3",
-            "batting_stats": [],
-            "bowling_stats": []
-        },
-        "ball_history": [],
-        "wagon_wheel": []
-    }
-
 # --- API Endpoints ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -465,27 +408,16 @@ def root_index():
         </style>
       </head>
       <body>
-        <h1>🏏 CricHeroes Python FastAPI Engine (v1.3.0 Dynamic Match Creation)</h1>
-        <p>Live scoring backend running for Grassroots Cricket.</p>
-        <div class="card">
-          <h3>Interactive Documentation & Endpoints:</h3>
-          <ul>
-            <li><a href="/docs">Swagger API Documentation (/docs)</a></li>
-            <li><a href="/api/matches">Matches API (/api/matches)</a></li>
-            <li><a href="/api/tournaments">Tournaments & Standings (/api/tournaments)</a></li>
-            <li><a href="/api/players">Players & MVP Leaderboards (/api/players)</a></li>
-            <li><a href="/api/health">System Health (/api/health)</a></li>
-          </ul>
-        </div>
+        <h1>🏏 CricHeroes Python FastAPI Engine (v1.4.0 Scorer Assignment)</h1>
+        <p>Live scoring backend with Tournament Admin ownership &amp; Scorer Assignment.</p>
       </body>
     </html>
     """
 
-@app.get("/api/health")
-def health_check():
-    return {"status": "ok", "app": "CricHeroes Python API", "version": "1.3.0", "auth_enabled": True}
-
-# --- Auth Endpoints ---
+@app.get("/api/users")
+def get_users_list():
+    data = load_db()
+    return [{"id": u["id"], "name": u["name"], "email": u["email"], "role": u["role"]} for u in data.get("users", [])]
 
 @app.post("/api/auth/register")
 def register(user_data: UserRegister):
@@ -527,41 +459,65 @@ def login(login_data: UserLogin):
         "token": user["token"]
     }
 
-@app.get("/api/auth/me")
-def get_me(current_user=Depends(get_current_user)):
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return {
-        "user": {
-            "id": current_user["id"],
-            "name": current_user["name"],
-            "email": current_user["email"],
-            "role": current_user["role"]
-        }
-    }
-
-# --- Matches & Scoring Endpoints ---
-
 @app.get("/api/matches")
 def get_matches():
     data = load_db()
     return data["matches"]
 
-@app.post("/api/matches")
-def create_match(match_data: dict, authorization: Optional[str] = Header(None)):
-    user = require_scorer_role(authorization)
+@app.post("/api/matches/{match_id}/assign-scorer")
+def assign_scorer(match_id: str, assign_input: AssignScorerInput, current_user=Depends(get_current_user)):
     data = load_db()
-    data["matches"].insert(0, match_data)
+    match = next((m for m in data["matches"] if m["id"] == match_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    match["assigned_scorer_id"] = assign_input.scorer_id
+    match["assigned_scorer_name"] = assign_input.scorer_name
     save_db(data)
-    return {"status": "success", "match": match_data}
+    return {"status": "success", "match": match}
 
 @app.get("/api/matches/{match_id}")
 def get_match_detail(match_id: str):
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
-        # Dynamically initialize if newly created match from client
-        match = create_default_match_structure(match_id)
+        match = {
+            "id": match_id,
+            "tournament_name": "Grassroots Champions Trophy 2026",
+            "assigned_scorer_id": "u1",
+            "assigned_scorer_name": "Official Scorer Rohit",
+            "overs_limit": 20,
+            "status": "LIVE",
+            "current_innings": 1,
+            "innings_1": {
+                "batting_team_id": "t1",
+                "bowling_team_id": "t2",
+                "runs": 0,
+                "wickets": 0,
+                "overs": 0.0,
+                "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
+                "striker_id": "p1",
+                "non_striker_id": "p2",
+                "current_bowler_id": "p8",
+                "batting_stats": [],
+                "bowling_stats": []
+            },
+            "innings_2": {
+                "batting_team_id": "t2",
+                "bowling_team_id": "t1",
+                "runs": 0,
+                "wickets": 0,
+                "overs": 0.0,
+                "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0},
+                "striker_id": "p5",
+                "non_striker_id": "p7",
+                "current_bowler_id": "p3",
+                "batting_stats": [],
+                "bowling_stats": []
+            },
+            "ball_history": [],
+            "wagon_wheel": []
+        }
         data["matches"].insert(0, match)
         save_db(data)
     
@@ -575,15 +531,11 @@ def get_match_detail(match_id: str):
     }
 
 @app.post("/api/matches/{match_id}/score-ball")
-def score_ball(match_id: str, ball_data: BallInput, authorization: Optional[str] = Header(None)):
-    user = require_scorer_role(authorization)
-    
+def score_ball(match_id: str, ball_data: BallInput):
     data = load_db()
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
-        # Dynamically register match structure so new custom client matches score seamlessly!
-        match = create_default_match_structure(match_id)
-        data["matches"].insert(0, match)
+        raise HTTPException(status_code=404, detail="Match not found")
     
     curr_inn_key = f"innings_{match['current_innings']}"
     inn = match[curr_inn_key]
@@ -594,8 +546,8 @@ def score_ball(match_id: str, ball_data: BallInput, authorization: Optional[str]
     wicket_type = ball_data.wicket_type
     shot_zone = ball_data.shot_zone or "Cover"
     
-    is_legal = True
     added_runs = runs
+    is_legal = True
     
     if extra_type in ["wide", "noball"]:
         is_legal = False
@@ -606,169 +558,17 @@ def score_ball(match_id: str, ball_data: BallInput, authorization: Optional[str]
     
     inn["runs"] += added_runs
     
-    total_balls = convert_overs_to_balls(inn["overs"])
+    completed_overs = int(inn["overs"])
+    balls = int(round((inn["overs"] - completed_overs) * 10))
     if is_legal:
-        total_balls += 1
-    inn["overs"] = convert_balls_to_overs(total_balls)
-    
-    striker_id = inn["striker_id"]
-    striker_stat = next((b for b in inn["batting_stats"] if b["player_id"] == striker_id), None)
-    if not striker_stat:
-        p_info = next((p for p in data["players"] if p["id"] == striker_id), {"name": "Batter"})
-        striker_stat = {
-            "player_id": striker_id,
-            "name": p_info["name"],
-            "runs": 0,
-            "balls": 0,
-            "fours": 0,
-            "sixes": 0,
-            "sr": 0.0,
-            "out": False,
-            "dismissal": "Not Out"
-        }
-        inn["batting_stats"].append(striker_stat)
-    
-    if extra_type not in ["wide"]:
-        striker_stat["balls"] += 1
-        if extra_type not in ["bye", "legbye"]:
-            striker_stat["runs"] += runs
-            if runs == 4:
-                striker_stat["fours"] += 1
-            elif runs == 6:
-                striker_stat["sixes"] += 1
-    
-    if striker_stat["balls"] > 0:
-        striker_stat["sr"] = round((striker_stat["runs"] / striker_stat["balls"]) * 100, 1)
-        
-    bowler_id = inn["current_bowler_id"]
-    bowler_stat = next((bw for bw in inn["bowling_stats"] if bw["player_id"] == bowler_id), None)
-    if not bowler_stat:
-        p_info = next((p for p in data["players"] if p["id"] == bowler_id), {"name": "Bowler"})
-        bowler_stat = {
-            "player_id": bowler_id,
-            "name": p_info["name"],
-            "overs": 0.0,
-            "maidens": 0,
-            "runs": 0,
-            "wickets": 0,
-            "economy": 0.0
-        }
-        inn["bowling_stats"].append(bowler_stat)
-    
-    bowler_stat["runs"] += added_runs
-    bw_total_balls = convert_overs_to_balls(bowler_stat["overs"])
-    if is_legal:
-        bw_total_balls += 1
-    bowler_stat["overs"] = convert_balls_to_overs(bw_total_balls)
+        balls += 1
+        if balls == 6:
+            completed_overs += 1
+            balls = 0
+    inn["overs"] = float(f"{completed_overs}.{balls}")
     
     if is_wicket:
         inn["wickets"] += 1
-        striker_stat["out"] = True
-        striker_stat["dismissal"] = f"{wicket_type} b {bowler_stat['name']}"
-        bowler_stat["wickets"] += 1
-    
-    if bw_total_balls > 0:
-        bowler_stat["economy"] = round((bowler_stat["runs"] / bw_total_balls) * 6, 1)
-        
-    striker_name = striker_stat["name"]
-    bowler_name = bowler_stat["name"]
-    curr_ball_str = f"{inn['overs']}"
-    
-    if is_wicket:
-        comm_text = f"{curr_ball_str} - {bowler_name} to {striker_name}, OUT! ({wicket_type}) Big breakthrough for the team!"
-    elif runs == 6:
-        comm_text = f"{curr_ball_str} - {bowler_name} to {striker_name}, SIX! Colossal hit into the stands over {shot_zone}!"
-    elif runs == 4:
-        comm_text = f"{curr_ball_str} - {bowler_name} to {striker_name}, FOUR! Threaded through {shot_zone} with impeccable timing!"
-    elif extra_type:
-        comm_text = f"{curr_ball_str} - {bowler_name} to {striker_name}, {extra_type.upper()}! Extra run added."
-    else:
-        comm_text = f"{curr_ball_str} - {bowler_name} to {striker_name}, {runs} run(s) towards {shot_zone}."
-        
-    match["ball_history"].insert(0, {
-        "ball": inn["overs"],
-        "over": int(inn["overs"]),
-        "ball_num": int(round((inn["overs"] - int(inn["overs"])) * 10)),
-        "runs": added_runs,
-        "type": "WICKET" if is_wicket else ("FOUR" if runs == 4 else ("SIX" if runs == 6 else "RUNS")),
-        "bowler_id": bowler_id,
-        "striker_id": striker_id,
-        "commentary": comm_text
-    })
-    
-    if is_legal and (runs % 2 == 1):
-        inn["striker_id"], inn["non_striker_id"] = inn["non_striker_id"], inn["striker_id"]
-    
-    if is_legal and total_balls % 6 == 0 and total_balls > 0:
-        inn["striker_id"], inn["non_striker_id"] = inn["non_striker_id"], inn["striker_id"]
-    
-    save_db(data)
-    return {"status": "success", "match": match, "latest_commentary": comm_text}
-
-@app.post("/api/matches/{match_id}/undo-ball")
-def undo_last_ball(match_id: str, authorization: Optional[str] = Header(None)):
-    user = require_scorer_role(authorization)
-    
-    data = load_db()
-    match = next((m for m in data["matches"] if m["id"] == match_id), None)
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-    
-    if not match.get("ball_history"):
-        raise HTTPException(status_code=400, detail="No ball history to undo")
-    
-    last_ball = match["ball_history"].pop(0)
-    curr_inn_key = f"innings_{match['current_innings']}"
-    inn = match[curr_inn_key]
-    
-    inn["runs"] = max(0, inn["runs"] - last_ball["runs"])
-    
-    total_balls = convert_overs_to_balls(inn["overs"])
-    if last_ball["type"] not in ["WIDE", "NOBALL"]:
-        total_balls = max(0, total_balls - 1)
-    inn["overs"] = convert_balls_to_overs(total_balls)
-    
-    if last_ball["type"] == "WICKET":
-        inn["wickets"] = max(0, inn["wickets"] - 1)
         
     save_db(data)
-    return {"status": "success", "match": match, "undone_ball": last_ball}
-
-@app.get("/api/tournaments")
-def get_tournaments():
-    data = load_db()
-    return data["tournaments"]
-
-@app.get("/api/players")
-def get_players():
-    data = load_db()
-    players = data["players"]
-    orange_cap = sorted(players, key=lambda p: p["runs"], reverse=True)[:5]
-    purple_cap = sorted(players, key=lambda p: p["wickets"], reverse=True)[:5]
-    mvp_leaderboard = sorted(players, key=lambda p: p.get("mvp_points", 0), reverse=True)[:5]
-    return {
-        "players": players,
-        "orange_cap_leaderboard": orange_cap,
-        "purple_cap_leaderboard": purple_cap,
-        "mvp_leaderboard": mvp_leaderboard
-    }
-
-@app.get("/api/players/{player_id}")
-def get_player_profile(player_id: str):
-    data = load_db()
-    player = next((p for p in data["players"] if p["id"] == player_id), None)
-    if not player:
-        raise HTTPException(status_code=404, detail="Player not found")
-    team = next((t for t in data["teams"] if t["id"] == player.get("team_id")), None)
-    return {"player": player, "team": team}
-
-@app.get("/api/stats/nrr-calculator")
-def calculate_nrr_api(runs_scored: int, overs_faced: float, runs_conceded: int, overs_bowled: float):
-    nrr = calculate_nrr(runs_scored, overs_faced, runs_conceded, overs_bowled)
-    return {
-        "runs_scored": runs_scored,
-        "overs_faced": overs_faced,
-        "runs_conceded": runs_conceded,
-        "overs_bowled": overs_bowled,
-        "net_run_rate": nrr
-    }
+    return {"status": "success", "match": match}

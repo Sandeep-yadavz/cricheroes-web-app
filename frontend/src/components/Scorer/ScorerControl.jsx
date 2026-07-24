@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { RotateCcw, AlertTriangle, UserCheck, Flame, Shield, ArrowRightLeft, Volume2, Target, Trophy, Award, Lock, ShieldAlert, ArrowRight } from 'lucide-react';
+import { RotateCcw, AlertTriangle, UserCheck, Flame, Shield, ArrowRightLeft, Volume2, Target, Trophy, Award, Lock, ShieldAlert, ArrowRight, Eye } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import WicketModal from './WicketModal';
 import MatchWinnerModal from './MatchWinnerModal';
 import DraggableFieldingWagonWheel from './DraggableFieldingWagonWheel';
+import AssignScorerModal from '../Tournaments/AssignScorerModal';
 
 export default function ScorerControl() {
-  const { match, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser, hasPermission, handleLogin, setActiveTab } = useCricket();
+  const { match, handleScoreBall, handleUndoBall, setIsWicketModalOpen, setIsWinnerModalOpen, currentUser, handleLogin } = useCricket();
   const [selectedShotZone, setSelectedShotZone] = useState('Cover');
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   const currKey = `innings_${match.current_innings}`;
   const inn = match[currKey] || match.innings_1;
   const strikerStat = inn.batting_stats.find(b => b.player_id === inn.striker_id) || { name: "Rohit Varma", runs: 68, balls: 42 };
   const nonStrikerStat = inn.batting_stats.find(b => b.player_id === inn.non_striker_id) || { name: "Virat Saxena", runs: 45, balls: 31 };
 
-  const canScore = hasPermission('SCORE_BALL');
+  // Check if current user is Assigned Scorer or Tournament Admin
+  const isAssignedScorer = currentUser && (currentUser.id === match.assigned_scorer_id || currentUser.role === 'SCORER' || currentUser.role === 'ORGANIZER');
+  const isTournamentAdmin = currentUser && (currentUser.role === 'ORGANIZER' || currentUser.id === match.admin_id);
 
   const onScore = (runs, extra_type = null) => {
-    if (!canScore) {
-      alert("Permission Error: Only Official Match Scorers or Tournament Admins can record ball scores.");
+    if (!isAssignedScorer) {
+      alert(`Permission Locked: Only Assigned Scorer (${match.assigned_scorer_name || 'Official Scorer'}) can record balls.`);
       return;
     }
     handleScoreBall({
@@ -28,53 +32,6 @@ export default function ScorerControl() {
       shot_zone: selectedShotZone
     });
   };
-
-  const handleSwitchToDemoScorer = async () => {
-    await handleLogin('scorer@cricheroes.in', 'scorer123');
-  };
-
-  if (!canScore) {
-    return (
-      <div className="max-w-xl mx-auto py-12 pb-24 space-y-6">
-        <div className="glass-card rounded-3xl p-8 border border-red-500/40 text-center space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-          <div className="w-20 h-20 mx-auto rounded-3xl bg-red-500/20 text-red-400 flex items-center justify-center font-bold border border-red-500/30 shadow-xl">
-            <Lock className="w-10 h-10" />
-          </div>
-
-          <div>
-            <span className="text-xs font-extrabold uppercase text-red-400 tracking-wider block">ROLE-BASED AUTHORIZATION RESTRICTION</span>
-            <h2 className="text-2xl font-heading font-black text-white mt-1">Scorer Console Locked</h2>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              You are currently signed in as <strong className="text-white">{currentUser ? currentUser.name : "Guest/Player"} ({currentUser ? currentUser.role : "PLAYER"})</strong>.
-              Only verified <span className="text-[#00D26A] font-bold">Official Match Scorers (SCORER)</span> or <span className="text-amber-400 font-bold">Tournament Directors (ORGANIZER)</span> have authorization to enter live ball-by-ball scores.
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-3 pt-2">
-            <button
-              onClick={handleSwitchToDemoScorer}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00FF95] text-black font-heading font-extrabold text-sm shadow-lg shadow-[#00D26A]/20 hover:opacity-95 transition flex items-center justify-center space-x-2"
-            >
-              <ShieldAlert className="w-4 h-4" />
-              <span>Switch to Demo Official Scorer Account</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => setActiveTab('match_center')}
-              className="w-full py-3 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 transition"
-            >
-              Return to Live Scorecard &amp; Commentary
-            </button>
-          </div>
-
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24">
@@ -88,32 +45,66 @@ export default function ScorerControl() {
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-extrabold uppercase text-[#00D26A] tracking-wider">Official Scorer Console</span>
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#00D26A]/10 text-[#00D26A] border border-[#00D26A]/30 uppercase">
-                {currentUser?.role} Authorized
-              </span>
+              {isAssignedScorer ? (
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#00D26A]/20 text-[#00D26A] border border-[#00D26A]/40 uppercase">
+                  🛡️ You are Assigned Scorer
+                </span>
+              ) : (
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase">
+                  👁️ Spectator Read-Only Mode
+                </span>
+              )}
             </div>
             <h2 className="text-2xl font-heading font-black text-white">Ball-by-Ball Live Scoring</h2>
-            <p className="text-xs text-slate-400 font-semibold">Match ID: {match.id} • {match.tournament_name}</p>
+            <p className="text-xs text-slate-400 font-semibold">
+              Assigned Scorer: <strong className="text-white">{match.assigned_scorer_name || "Official Scorer Rohit"}</strong>
+            </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          <button
-            onClick={handleUndoBall}
-            className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-800 transition"
-          >
-            <RotateCcw className="w-4 h-4 text-amber-400" />
-            <span>Undo Ball</span>
-          </button>
-          <button
-            onClick={() => setIsWinnerModalOpen(true)}
-            className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-lg shadow-amber-500/20 transition"
-          >
-            <Trophy className="w-4 h-4" />
-            <span>End Match</span>
-          </button>
+          {isTournamentAdmin && (
+            <button
+              onClick={() => setIsAssignModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold shadow-lg shadow-amber-500/20 transition"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Assign Scorer</span>
+            </button>
+          )}
+
+          {isAssignedScorer && (
+            <>
+              <button
+                onClick={handleUndoBall}
+                className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-800 transition"
+              >
+                <RotateCcw className="w-4 h-4 text-amber-400" />
+                <span>Undo Ball</span>
+              </button>
+              <button
+                onClick={() => setIsWinnerModalOpen(true)}
+                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-lg shadow-red-600/20 transition"
+              >
+                <Trophy className="w-4 h-4" />
+                <span>End Match</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Spectator Read-Only Informational Alert if non-assigned */}
+      {!isAssignedScorer && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Eye className="w-5 h-5 text-amber-400 shrink-0" />
+            <span>
+              <strong>Spectator Mode:</strong> You are viewing live match updates in real-time as <strong>{match.assigned_scorer_name || "Official Scorer Rohit"}</strong> scores this match. Touch controls &amp; fielder dragging are locked for spectators.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main Scorecard Header */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -137,11 +128,11 @@ export default function ScorerControl() {
         </div>
       </div>
 
-      {/* Touch Run Scoring Deck */}
-      <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-5">
+      {/* Touch Run Scoring Keypad */}
+      <div className={`glass-card rounded-3xl p-6 border border-slate-800 space-y-5 ${!isAssignedScorer ? 'opacity-60 pointer-events-none' : ''}`}>
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="font-heading font-extrabold text-white text-base">Touch Score Keypad</h3>
-          <span className="text-xs font-bold text-slate-400">Tap runs or extras to score</span>
+          <span className="text-xs font-bold text-slate-400">{isAssignedScorer ? 'Tap runs or extras to score' : '🔒 Scorer Keypad Locked'}</span>
         </div>
 
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
@@ -163,11 +154,12 @@ export default function ScorerControl() {
         </div>
       </div>
 
-      {/* Draggable Wagon Wheel & Fielder Placement Widget */}
-      <DraggableFieldingWagonWheel onZoneSelect={(zone) => setSelectedShotZone(zone)} />
+      {/* Draggable Wagon Wheel & Fielder Placement Widget (Editable only by Assigned Scorer!) */}
+      <DraggableFieldingWagonWheel onZoneSelect={(zone) => setSelectedShotZone(zone)} isEditable={isAssignedScorer} />
 
       <WicketModal />
       <MatchWinnerModal isOpen={false} onClose={() => {}} />
+      <AssignScorerModal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} />
     </div>
   );
 }

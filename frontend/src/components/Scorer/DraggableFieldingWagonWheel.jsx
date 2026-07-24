@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Compass, RotateCcw, CheckCircle, AlertTriangle, Move } from 'lucide-react';
+import { Compass, RotateCcw, CheckCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
 const INITIAL_FIELDERS = [
@@ -16,7 +16,7 @@ const INITIAL_FIELDERS = [
   { id: 'f11', name: 'Bowler', zone: 'Bowler', x: 200, y: 145, isFixed: true }
 ];
 
-export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
+export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable = true }) {
   const { match } = useCricket();
   const [fielders, setFielders] = useState(INITIAL_FIELDERS);
   const [draggingId, setDraggingId] = useState(null);
@@ -34,7 +34,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
   };
 
   const handleStartDrag = (id, isFixed, e) => {
-    if (isFixed) return; // Keeper & Bowler are fixed
+    if (!isEditable || isFixed) return; // Only Assigned Scorer can drag fielders!
     e.preventDefault();
     setDraggingId(id);
   };
@@ -42,7 +42,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
   // Ultra-Smooth Window Pointer Listeners for effortless dragging
   useEffect(() => {
     const handleWindowMove = (e) => {
-      if (!draggingId) return;
+      if (!draggingId || !isEditable) return;
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       const { x, y } = getSVGCoords(clientX, clientY);
@@ -77,17 +77,20 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
       window.removeEventListener('touchmove', handleWindowMove);
       window.removeEventListener('touchend', handleWindowEnd);
     };
-  }, [draggingId]);
+  }, [draggingId, isEditable]);
 
-  // Click directly anywhere on field to move nearest movable fielder smoothly!
+  // Click directly anywhere on field
   const handleFieldClick = (e) => {
+    if (!isEditable) {
+      alert("View-Only Mode: Only the Assigned Match Scorer can move fielders or change placements.");
+      return;
+    }
     if (draggingId) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const { x, y } = getSVGCoords(clientX, clientY);
     const zone = determineZone(x, y);
 
-    // Find nearest non-fixed fielder
     let minDistance = Infinity;
     let targetFielder = null;
 
@@ -110,7 +113,6 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
     }
   };
 
-  // Determine Cricket Zone based on coordinates
   const determineZone = (x, y) => {
     const dx = x - 200;
     const dy = y - 200;
@@ -127,23 +129,16 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
     return 'Cover';
   };
 
-  // --- Official Cricket Rule Validation Checks ---
   const validateFieldingRules = () => {
     let errors = [];
-
     let outside30Yard = 0;
     let legSideCount = 0;
-    let deepBehindSquareLeg = 0;
 
     fielders.forEach((f) => {
-      if (f.id === 'f1' || f.id === 'f11') return; // Ignore Keeper & Bowler for 30-yard count
-
+      if (f.id === 'f1' || f.id === 'f11') return;
       const dist = Math.hypot(f.x - 200, f.y - 200);
       if (dist > 90) outside30Yard++;
-
       if (f.x < 200) legSideCount++;
-
-      if (f.x < 200 && f.y > 235) deepBehindSquareLeg++;
     });
 
     const maxOutside = isPowerplay ? 2 : 5;
@@ -155,16 +150,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
       errors.push(`Law 28.4: Max 5 fielders allowed on Leg Side (Current: ${legSideCount})`);
     }
 
-    if (deepBehindSquareLeg > 2) {
-      errors.push(`Law 28.4: Max 2 fielders behind Square Leg on Leg Side (Current: ${deepBehindSquareLeg})`);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      outside30Yard,
-      legSideCount
-    };
+    return { isValid: errors.length === 0, errors, outside30Yard, legSideCount };
   };
 
   const ruleStatus = validateFieldingRules();
@@ -179,15 +165,24 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
             <Compass className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-heading font-extrabold text-white text-base">Smooth Field Placement Console</h3>
-            <p className="text-[11px] text-slate-400">Tap or drag any fielder • Bowler &amp; Keeper fixed</p>
+            <h3 className="font-heading font-extrabold text-white text-base">Field Placement &amp; Wagon Wheel</h3>
+            <p className="text-[11px] text-slate-400">
+              {isEditable ? '🛡️ You are the Assigned Scorer • Drag fielders to update positions' : '👁️ Spectator Mode • Read-only field positions'}
+            </p>
           </div>
         </div>
 
-        {/* Selected Zone Badge */}
-        <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400">Active Zone:</span>
-          <span className="font-black text-[#00D26A]">{selectedZone}</span>
+        {/* Active Mode Badge */}
+        <div className="flex items-center space-x-2">
+          {isEditable ? (
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#00D26A]/20 text-[#00D26A] border border-[#00D26A]/40 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" /> Scorer Editable
+            </span>
+          ) : (
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+              <Eye className="w-3 h-3 text-amber-400" /> Read-Only
+            </span>
+          )}
         </div>
       </div>
 
@@ -206,13 +201,15 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsPowerplay(!isPowerplay)}
-          className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-extrabold text-slate-300 hover:text-white uppercase"
-        >
-          {isPowerplay ? '⚡ Powerplay (Max 2)' : '🛡️ Normal (Max 5)'}
-        </button>
+        {isEditable && (
+          <button
+            type="button"
+            onClick={() => setIsPowerplay(!isPowerplay)}
+            className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-extrabold text-slate-300 hover:text-white uppercase"
+          >
+            {isPowerplay ? '⚡ Powerplay (Max 2)' : '🛡️ Normal (Max 5)'}
+          </button>
+        )}
       </div>
 
       {/* SVG Interactive Field */}
@@ -220,7 +217,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
         <svg
           ref={svgRef}
           viewBox="0 0 400 400"
-          className="w-full h-full cursor-pointer touch-none"
+          className={`w-full h-full ${isEditable ? 'cursor-pointer touch-none' : 'cursor-default'}`}
           onClick={handleFieldClick}
         >
           {/* Outfield Grass */}
@@ -263,17 +260,14 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
                 transform={`translate(${f.x}, ${f.y})`}
                 onMouseDown={(e) => handleStartDrag(f.id, f.isFixed, e)}
                 onTouchStart={(e) => handleStartDrag(f.id, f.isFixed, e)}
-                className={f.isFixed ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"}
+                className={!isEditable || f.isFixed ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"}
               >
-                {/* Large Invisible Hit Area for Easy Touch/Drag */}
                 <circle r="22" fill="transparent" />
 
-                {/* Outer Glow Ring on Active Drag */}
                 {isBeingDragged && (
                   <circle r="16" fill="none" stroke="#00D26A" strokeWidth="2.5" className="animate-ping" />
                 )}
 
-                {/* Visible Fielder Marker */}
                 <circle
                   r={isBeingDragged ? "13" : "11"}
                   fill={f.isFixed ? "#0066FF" : (isOutside ? "#FF9900" : "#FF3366")}
@@ -293,7 +287,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
           })}
         </svg>
 
-        {/* Legend & Instructions */}
+        {/* Legend */}
         <div className="absolute bottom-3 left-3 right-3 bg-slate-900/95 border border-slate-800 px-3 py-1.5 rounded-xl text-center text-[10px] font-semibold text-slate-300 flex items-center justify-around">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#0066FF]"></span> 🔒 Bowler/Keeper (Fixed)</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#FF3366]"></span> Inside 30-Yd</span>
