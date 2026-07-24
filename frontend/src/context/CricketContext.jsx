@@ -19,6 +19,42 @@ const INITIAL_FIELDERS = [
   { id: 'f11', name: 'Bowler', zone: 'Bowler', x: 200, y: 145, isFixed: true }
 ];
 
+const INITIAL_BALL_HISTORY = [
+  {
+    id: "b1",
+    over: "14.3",
+    runs: 4,
+    extra_type: null,
+    is_wicket: false,
+    striker_name: "Rohit Varma",
+    bowler_name: "Rashid Khan",
+    shot_zone: "Cover",
+    description: "14.3 Rashid Khan to Rohit Varma, FOUR RUNS! Beautifully driven along the ground to Cover!"
+  },
+  {
+    id: "b2",
+    over: "14.2",
+    runs: 1,
+    extra_type: "noball",
+    is_wicket: false,
+    striker_name: "Rohit Varma",
+    bowler_name: "Rashid Khan",
+    shot_zone: "Mid Off",
+    description: "14.2 Rashid Khan to Rohit Varma, NO BALL + 1 RUN! Smashed firmly towards Mid Off! Free Hit coming up!"
+  },
+  {
+    id: "b3",
+    over: "14.1",
+    runs: 6,
+    extra_type: null,
+    is_wicket: false,
+    striker_name: "Rohit Varma",
+    bowler_name: "Rashid Khan",
+    shot_zone: "Mid Wicket",
+    description: "14.1 Rashid Khan to Rohit Varma, SIX RUNS! Massive hit high into the stands at Mid Wicket!"
+  }
+];
+
 const INITIAL_TEAMS = {
   t1: { id: "t1", name: "Mumbai Strikers", short_name: "MUM", logo: "🔥", color: "#0066FF" },
   t2: { id: "t2", name: "Delhi Dynamites", short_name: "DEL", logo: "⚡", color: "#FF3366" },
@@ -30,7 +66,8 @@ const INITIAL_PLAYERS = {
   p1: { id: "p1", name: "Rohit Varma", team_id: "t1", role: "Batter", runs: 842, wickets: 4, highest_score: 112, sr: 145.2, avg: 42.1, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" },
   p2: { id: "p2", name: "Virat Saxena", team_id: "t1", role: "Batter", runs: 1150, wickets: 8, highest_score: 128, sr: 138.5, avg: 52.2, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" },
   p4: { id: "p4", name: "Hardik Patel", team_id: "t1", role: "All-Rounder", runs: 620, wickets: 32, highest_score: 78, sr: 162.4, avg: 31.0, avatar: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80" },
-  p5: { id: "p5", name: "Rishabh Singh", team_id: "t1", role: "Wicket-Keeper Batter", runs: 790, wickets: 0, highest_score: 95, sr: 154.8, avg: 37.6, avatar: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80" }
+  p5: { id: "p5", name: "Rishabh Singh", team_id: "t1", role: "Wicket-Keeper Batter", runs: 790, wickets: 0, highest_score: 95, sr: 154.8, avg: 37.6, avatar: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80" },
+  p8: { id: "p8", name: "Rashid Khan", team_id: "t2", role: "Bowler", runs: 310, wickets: 52, highest_score: 42, sr: 160.0, avg: 18.2, avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80" }
 };
 
 const INITIAL_TOURNAMENTS = [
@@ -92,7 +129,7 @@ const INITIAL_MATCH = {
     batting_stats: [],
     bowling_stats: []
   },
-  ball_history: [],
+  ball_history: INITIAL_BALL_HISTORY,
   wagon_wheel: []
 };
 
@@ -116,6 +153,20 @@ export function CricketProvider({ children }) {
 
   const [isWicketModalOpen, setIsWicketModalOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const matchRes = await apiClient.get('/api/matches/m1');
+        if (matchRes && matchRes.match) {
+          setMatch(matchRes.match);
+          if (matchRes.teams) setTeams(matchRes.teams);
+          if (matchRes.players) setPlayers(matchRes.players);
+        }
+      } catch (err) {}
+    }
+    loadData();
+  }, []);
 
   const handleUpdateFieldingPositions = (newFielders) => {
     setMatch((prev) => ({
@@ -155,6 +206,12 @@ export function CricketProvider({ children }) {
 
       if (res && res.match) {
         setMatch(res.match);
+
+        // Speak Live Commentary Text using Speech Synth
+        if (soundEnabled && res.match.ball_history && res.match.ball_history.length > 0) {
+          const latestBall = res.match.ball_history[0];
+          commentaryVoice(latestBall.description || `${latestBall.over} ${latestBall.striker_name} scores ${latestBall.runs} runs.`);
+        }
         return;
       }
     } catch (e) {}
@@ -189,38 +246,41 @@ export function CricketProvider({ children }) {
         }
       }
 
-      inn.overs = parseFloat(`${completedOvers}.${balls}`);
+      const overStr = `${completedOvers}.${balls}`;
+      inn.overs = parseFloat(overStr);
+
+      const strikerObj = players[inn.striker_id] || { name: "Rohit Varma" };
+      const bowlerObj = players[inn.current_bowler_id] || { name: "Rashid Khan" };
+
+      let descText = "";
       if (is_wicket) {
         inn.wickets += 1;
         const newB = players[new_batter_id] || { name: "Hardik Patel" };
-
-        // Mark dismissed batter as out
-        const dismissedId = out_batter === 'striker' ? inn.striker_id : inn.non_striker_id;
-        const dismissedStat = inn.batting_stats.find(b => b.player_id === dismissedId);
-        if (dismissedStat) {
-          dismissedStat.out = true;
-          dismissedStat.dismissal = wicket_type === 'Run Out' ? `run out (${fielder_name || 'Rashid'})` : `b Bowler`;
-        }
-
-        // Switch to new batsman
-        if (out_batter === 'striker') {
-          inn.striker_id = new_batter_id;
-        } else {
-          inn.non_striker_id = new_batter_id;
-        }
-
-        inn.batting_stats.push({
-          player_id: new_batter_id,
-          name: newB.name,
-          runs: 0,
-          balls: 0,
-          fours: 0,
-          sixes: 0,
-          sr: 0.0,
-          out: false,
-          dismissal: "Not Out"
-        });
+        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, OUT (${wicket_type || 'Bowled'})! Big wicket falls at ${shot_zone}! New batter ${newB.name} enters!`;
+      } else if (runs === 6) {
+        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, SIX RUNS! Massive hit over ${shot_zone}!`;
+      } else if (runs === 4) {
+        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, FOUR RUNS! Driven nicely to ${shot_zone}!`;
+      } else {
+        descText = `${overStr} ${bowlerObj.name} to ${strikerObj.name}, ${runs} run(s) towards ${shot_zone}.`;
       }
+
+      const newBall = {
+        id: `b_${Date.now()}`,
+        over: overStr,
+        runs: addedRuns,
+        extra_type,
+        is_wicket,
+        striker_name: strikerObj.name,
+        bowler_name: bowlerObj.name,
+        shot_zone: shot_zone,
+        description: descText
+      };
+
+      if (!newMatch.ball_history) newMatch.ball_history = [];
+      newMatch.ball_history.unshift(newBall);
+
+      if (soundEnabled) commentaryVoice(descText);
 
       return newMatch;
     });

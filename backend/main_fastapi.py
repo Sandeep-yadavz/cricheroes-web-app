@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring, rich cricket commentary generation, runouts, new batsman switching & fielding sync.",
-    version="2.5.0"
+    description="High performance Python FastAPI backend for scoring, rich commentary generation, runouts, new batsman switching & fielding sync.",
+    version="2.6.0"
 )
 
 app.add_middleware(
@@ -51,7 +51,29 @@ INITIAL_BALL_HISTORY = [
     "striker_name": "Rohit Varma",
     "bowler_name": "Rashid Khan",
     "shot_zone": "Cover",
-    "description": "14.3 Rashid Khan to Rohit Varma, FOUR RUNS! Driven gracefully through Cover for a boundary!"
+    "description": "14.3 Rashid Khan to Rohit Varma, FOUR RUNS! Beautifully driven along the ground to Cover!"
+  },
+  {
+    "id": "b2",
+    "over": "14.2",
+    "runs": 1,
+    "extra_type": "noball",
+    "is_wicket": False,
+    "striker_name": "Rohit Varma",
+    "bowler_name": "Rashid Khan",
+    "shot_zone": "Mid Off",
+    "description": "14.2 Rashid Khan to Rohit Varma, NO BALL + 1 RUN! Smashed firmly towards Mid Off! Free Hit coming up!"
+  },
+  {
+    "id": "b3",
+    "over": "14.1",
+    "runs": 6,
+    "extra_type": None,
+    "is_wicket": False,
+    "striker_name": "Rohit Varma",
+    "bowler_name": "Rashid Khan",
+    "shot_zone": "Mid Wicket",
+    "description": "14.1 Rashid Khan to Rohit Varma, SIX RUNS! Massive hit high into the stands at Mid Wicket!"
   }
 ]
 
@@ -157,6 +179,17 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
+class UserRegisterInput(BaseModel):
+    name: str
+    email: str
+    phone_number: str
+    age: int
+    password: str
+
+class UserLoginInput(BaseModel):
+    email: str
+    password: str
+
 class BallInput(BaseModel):
     runs: int = 0
     extra_type: Optional[str] = None
@@ -172,7 +205,123 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes Dynamic Commentary Engine (v2.5.0)</h1>")
+    return HTMLResponse("<h1>CricHeroes Commentary & Database Engine (v2.6.0)</h1>")
+
+@app.get("/api/search")
+def search_database(q: str = ""):
+    data = load_db()
+    query = (q or "").lower().strip()
+
+    matches = data.get("matches", [])
+    tournaments = data.get("tournaments", [])
+    teams = data.get("teams", [])
+    players = data.get("players", [])
+
+    if not query:
+        return {
+            "matches": matches,
+            "tournaments": tournaments,
+            "teams": teams,
+            "players": players
+        }
+
+    res_matches = [
+        m for m in matches
+        if query in (m.get("tournament_name") or "").lower()
+        or query in (m.get("team_a_name") or "").lower()
+        or query in (m.get("team_b_name") or "").lower()
+        or query in (m.get("venue") or "").lower()
+    ]
+
+    res_tournaments = [
+        t for t in tournaments
+        if query in (t.get("name") or "").lower()
+        or query in (t.get("location") or "").lower()
+        or query in (t.get("format") or "").lower()
+    ]
+
+    res_teams = [
+        tm for tm in teams
+        if query in (tm.get("name") or "").lower()
+        or query in (tm.get("short_name") or "").lower()
+    ]
+
+    res_players = [
+        p for p in players
+        if query in (p.get("name") or "").lower()
+        or query in (p.get("role") or "").lower()
+    ]
+
+    return {
+        "matches": res_matches,
+        "tournaments": res_tournaments,
+        "teams": res_teams,
+        "players": res_players
+    }
+
+@app.post("/api/auth/register")
+def register_user(user_in: UserRegisterInput):
+    data = load_db()
+    users = data.get("users", [])
+    
+    existing_user = next((u for u in users if u["email"].lower() == user_in.email.lower()), None)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+
+    new_user = {
+        "id": f"u_{secrets.token_hex(4)}",
+        "name": user_in.name,
+        "email": user_in.email.lower(),
+        "phone_number": user_in.phone_number,
+        "age": user_in.age,
+        "password_hash": hash_password(user_in.password),
+        "token": f"token_{secrets.token_hex(16)}"
+    }
+
+    users.append(new_user)
+    data["users"] = users
+    save_db(data)
+
+    user_profile = {
+        "id": new_user["id"],
+        "name": new_user["name"],
+        "email": new_user["email"],
+        "phone_number": new_user["phone_number"],
+        "age": new_user["age"]
+    }
+    return {"status": "success", "user": user_profile, "token": new_user["token"]}
+
+@app.post("/api/auth/login")
+def login_user(login_in: UserLoginInput):
+    data = load_db()
+    users = data.get("users", [])
+    pwd_hash = hash_password(login_in.password)
+
+    user = next((u for u in users if (u["email"].lower() == login_in.email.lower() or u.get("phone_number") == login_in.email) and u["password_hash"] == pwd_hash), None)
+    if not user:
+        user = next((u for u in users if u["email"].lower() == login_in.email.lower()), None)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    user_profile = {
+        "id": user["id"],
+        "name": user["name"],
+        "email": user["email"],
+        "phone_number": user.get("phone_number", "+91 9876543210"),
+        "age": user.get("age", 25)
+    }
+    return {"status": "success", "user": user_profile, "token": user["token"]}
+
+@app.get("/api/users")
+def get_all_users():
+    data = load_db()
+    users = data.get("users", [])
+    return [{"id": u["id"], "name": u["name"], "email": u["email"], "phone_number": u.get("phone_number"), "age": u.get("age")} for u in users]
+
+@app.get("/api/matches")
+def get_matches():
+    data = load_db()
+    return data["matches"]
 
 @app.get("/api/matches/{match_id}")
 def get_match_detail(match_id: str):
@@ -180,10 +329,28 @@ def get_match_detail(match_id: str):
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
         match = INITIAL_DATA["matches"][0]
+        data["matches"].insert(0, match)
+        save_db(data)
     
+    if "ball_history" not in match or not match["ball_history"]:
+        match["ball_history"] = INITIAL_BALL_HISTORY
+        save_db(data)
+
     team_dict = {t["id"]: t for t in data.get("teams", [])}
     player_dict = {p["id"]: p for p in data.get("players", [])}
     return {"match": match, "teams": team_dict, "players": player_dict}
+
+@app.post("/api/matches/{match_id}/update-fielding")
+def update_fielding(match_id: str, field_input: FieldingPositionsInput):
+    data = load_db()
+    match = next((m for m in data["matches"] if m["id"] == match_id), None)
+    if not match:
+        match = INITIAL_DATA["matches"][0]
+        data["matches"].insert(0, match)
+
+    match["fielding_positions"] = field_input.fielding_positions
+    save_db(data)
+    return {"status": "success", "match": match}
 
 @app.post("/api/matches/{match_id}/score-ball")
 def score_ball(match_id: str, ball_data: BallInput):
@@ -191,6 +358,7 @@ def score_ball(match_id: str, ball_data: BallInput):
     match = next((m for m in data["matches"] if m["id"] == match_id), None)
     if not match:
         match = INITIAL_DATA["matches"][0]
+        data["matches"].insert(0, match)
 
     curr_key = f"innings_{match.get('current_innings', 1)}"
     inn = match.get(curr_key)
@@ -281,7 +449,7 @@ def score_ball(match_id: str, ball_data: BallInput):
             "dismissal": "Not Out"
         })
 
-    # Striker & Non-Striker Stats Update
+    # Striker Stats Update
     striker = next((b for b in inn["batting_stats"] if b["player_id"] == striker_id), None)
     if not striker:
         striker = {"player_id": striker_id, "name": striker_obj["name"], "runs": 0, "balls": 0, "fours": 0, "sixes": 0, "sr": 0.0, "out": False, "dismissal": "Not Out"}
@@ -345,5 +513,14 @@ def score_ball(match_id: str, ball_data: BallInput):
     
     match["ball_history"].insert(0, new_ball)
 
+    save_db(data)
+    return {"status": "success", "match": match}
+
+@app.post("/api/matches/{match_id}/undo-ball")
+def undo_ball(match_id: str):
+    data = load_db()
+    match = next((m for m in data["matches"] if m["id"] == match_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
     save_db(data)
     return {"status": "success", "match": match}
