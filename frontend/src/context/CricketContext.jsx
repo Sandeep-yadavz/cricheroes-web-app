@@ -5,6 +5,20 @@ import { apiClient } from '../api/apiClient';
 
 const CricketContext = createContext();
 
+const INITIAL_FIELDERS = [
+  { id: 'f1', name: 'Wicket Keeper', zone: 'Keeper', x: 200, y: 310, isFixed: true },
+  { id: 'f2', name: '1st Slip', zone: 'Slips', x: 225, y: 315, isFixed: false },
+  { id: 'f3', name: 'Point', zone: 'Point', x: 280, y: 200, isFixed: false },
+  { id: 'f4', name: 'Cover', zone: 'Cover', x: 260, y: 150, isFixed: false },
+  { id: 'f5', name: 'Mid Off', zone: 'Mid Off', x: 220, y: 130, isFixed: false },
+  { id: 'f6', name: 'Mid On', zone: 'Mid On', x: 180, y: 130, isFixed: false },
+  { id: 'f7', name: 'Mid Wicket', zone: 'Mid Wicket', x: 140, y: 160, isFixed: false },
+  { id: 'f8', name: 'Square Leg', zone: 'Square Leg', x: 120, y: 200, isFixed: false },
+  { id: 'f9', name: 'Fine Leg', zone: 'Fine Leg', x: 140, y: 280, isFixed: false },
+  { id: 'f10', name: 'Third Man', zone: 'Third Man', x: 290, y: 290, isFixed: false },
+  { id: 'f11', name: 'Bowler', zone: 'Bowler', x: 200, y: 145, isFixed: true }
+];
+
 const INITIAL_TEAMS = {
   t1: { id: "t1", name: "Mumbai Strikers", short_name: "MUM", logo: "🔥", color: "#0066FF" },
   t2: { id: "t2", name: "Delhi Dynamites", short_name: "DEL", logo: "⚡", color: "#FF3366" },
@@ -34,6 +48,9 @@ const INITIAL_MATCH = {
   toss_winner: "t1",
   toss_decision: "bat",
   current_innings: 1,
+  assigned_scorer_id: "u1",
+  assigned_scorer_name: "Official Scorer Rohit",
+  fielding_positions: INITIAL_FIELDERS,
   innings_1: {
     batting_team_id: "t1",
     bowling_team_id: "t2",
@@ -67,16 +84,8 @@ const INITIAL_MATCH = {
     batting_stats: [],
     bowling_stats: []
   },
-  ball_history: [
-    { ball: 14.3, over: 14, ball_num: 3, runs: 6, type: "RUNS", bowler_id: "p8", striker_id: "p1", commentary: "14.3 - Rashid Khan to Rohit Varma, SIX! Stand and deliver! Crinkled over long-on for a monster maximum!" },
-    { ball: 14.2, over: 14, ball_num: 2, runs: 4, type: "RUNS", bowler_id: "p8", striker_id: "p1", commentary: "14.2 - Rashid Khan to Rohit Varma, FOUR! Glorious cover drive finding the boundary gap precisely!" },
-    { ball: 14.1, over: 14, ball_num: 1, runs: 1, type: "RUNS", bowler_id: "p8", striker_id: "p2", commentary: "14.1 - Rashid Khan to Virat Saxena, 1 run, pushed down to mid-off for a quick single." }
-  ],
-  wagon_wheel: [
-    { x: 120, y: 80, runs: 6, shot_type: "Long On" },
-    { x: 220, y: 90, runs: 4, shot_type: "Cover" },
-    { x: 160, y: 190, runs: 1, shot_type: "Mid Off" }
-  ]
+  ball_history: [],
+  wagon_wheel: []
 };
 
 export function CricketProvider({ children }) {
@@ -96,24 +105,27 @@ export function CricketProvider({ children }) {
   const [isWicketModalOpen, setIsWicketModalOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
 
+  // Real-time Update Fielding Positions Handler
+  const handleUpdateFieldingPositions = (newFielders) => {
+    setMatch((prev) => ({
+      ...prev,
+      fielding_positions: newFielders
+    }));
+    apiClient.post(`/api/matches/${match.id}/update-fielding`, {
+      fielding_positions: newFielders
+    }).catch(() => {});
+  };
+
   // Role-Based Permission Check Helper
   const hasPermission = (action) => {
     if (!currentUser) return false;
-    const role = currentUser.role;
-
     if (action === 'SCORE_BALL' || action === 'UNDO_BALL' || action === 'END_MATCH') {
-      return role === 'SCORER' || role === 'ORGANIZER';
+      return currentUser.id === match.assigned_scorer_id || currentUser.id === match.admin_id;
     }
-    if (action === 'CREATE_TEAM' || action === 'MANAGE_TOURNAMENT' || action === 'CREATE_MATCH') {
-      return role === 'ORGANIZER';
-    }
-    if (action === 'VIEW_STATS' || action === 'VIEW_SCORECARD') {
-      return true; // Everyone can view scorecards
-    }
-    return false;
+    return true;
   };
 
-  // Sync with Backend FastAPI on load
+  // Sync with Backend FastAPI on load & polling interval
   useEffect(() => {
     async function loadData() {
       try {
@@ -128,14 +140,11 @@ export function CricketProvider({ children }) {
       }
     }
     loadData();
+    const interval = setInterval(loadData, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, shot_zone = "Cover" }) => {
-    if (!hasPermission('SCORE_BALL')) {
-      alert("Permission Error: Only Official Scorers or Tournament Admins can record match balls.");
-      return;
-    }
-
     if (soundEnabled) {
       if (is_wicket) playMatchSound('wicket');
       else if (runs === 6) playMatchSound('six');
@@ -155,9 +164,6 @@ export function CricketProvider({ children }) {
 
       if (res && res.match) {
         setMatch(res.match);
-        if (res.latest_commentary && soundEnabled) {
-          commentaryVoice.speak(res.latest_commentary);
-        }
         return;
       }
     } catch (e) {
@@ -195,94 +201,20 @@ export function CricketProvider({ children }) {
       }
 
       inn.overs = parseFloat(`${completedOvers}.${balls}`);
-
-      if (is_wicket) {
-        inn.wickets += 1;
-      }
-
-      const strikerId = inn.striker_id;
-      let strikerStat = inn.batting_stats.find(b => b.player_id === strikerId);
-      if (!strikerStat) {
-        const pInfo = players[strikerId] || { name: "Batter" };
-        strikerStat = { player_id: strikerId, name: pInfo.name, runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0, out: false, dismissal: "Not Out" };
-        inn.batting_stats.push(strikerStat);
-      }
-
-      if (extra_type !== 'wide') {
-        strikerStat.balls += 1;
-        if (extra_type !== 'bye' && extra_type !== 'legbye') {
-          strikerStat.runs += runs;
-          if (runs === 4) strikerStat.fours += 1;
-          if (runs === 6) strikerStat.sixes += 1;
-        }
-      }
-
-      if (strikerStat.balls > 0) {
-        strikerStat.sr = parseFloat(((strikerStat.runs / strikerStat.balls) * 100).toFixed(1));
-      }
-
-      if (is_wicket) {
-        strikerStat.out = true;
-        strikerStat.dismissal = `${wicket_type || 'Out'} b Bowler`;
-      }
-
-      const commText = is_wicket
-        ? `${inn.overs} - WICKET! ${strikerStat.name} is out (${wicket_type || 'Dismissed'})!`
-        : `${inn.overs} - ${strikerStat.name} scores ${runs} run(s) towards ${shot_zone}.`;
-
-      if (soundEnabled) {
-        commentaryVoice.speak(commText);
-      }
-
-      newMatch.ball_history.unshift({
-        ball: inn.overs,
-        over: completedOvers,
-        ball_num: balls,
-        runs: addedRuns,
-        type: is_wicket ? 'WICKET' : (runs === 4 ? 'FOUR' : (runs === 6 ? 'SIX' : 'RUNS')),
-        commentary: commText
-      });
+      if (is_wicket) inn.wickets += 1;
 
       return newMatch;
     });
   };
 
   const handleUndoBall = async () => {
-    if (!hasPermission('UNDO_BALL')) {
-      alert("Permission Error: Only Official Scorers can undo balls.");
-      return;
-    }
-
     try {
       const res = await apiClient.post(`/api/matches/${match.id}/undo-ball`);
       if (res && res.match) {
         setMatch(res.match);
         return;
       }
-    } catch (e) {
-      console.log("Backend undo fallback");
-    }
-
-    setMatch((prevMatch) => {
-      const newMatch = JSON.parse(JSON.stringify(prevMatch));
-      if (!newMatch.ball_history || newMatch.ball_history.length === 0) return prevMatch;
-
-      const lastBall = newMatch.ball_history.shift();
-      const currKey = `innings_${newMatch.current_innings}`;
-      const inn = newMatch[currKey];
-
-      inn.runs = Math.max(0, inn.runs - lastBall.runs);
-      if (lastBall.type === 'WICKET') {
-        inn.wickets = Math.max(0, inn.wickets - 1);
-      }
-
-      return newMatch;
-    });
-  };
-
-  const handleCreateMatchState = (newMatch) => {
-    setMatch(newMatch);
-    apiClient.post('/api/matches', newMatch).catch(() => {});
+    } catch (e) {}
   };
 
   const handleLogin = async (email, password) => {
@@ -293,26 +225,22 @@ export function CricketProvider({ children }) {
         apiClient.setToken(res.token);
         return res.user;
       }
-    } catch (e) {
-      console.log("Auth backend fallback");
-    }
-    const fakeUser = { id: "u_demo", name: "Official Scorer Rohit", email, role: "SCORER" };
+    } catch (e) {}
+    const fakeUser = { id: "u1", name: "Official Scorer Rohit", email };
     setCurrentUser(fakeUser);
     return fakeUser;
   };
 
-  const handleRegister = async (name, email, password, role) => {
+  const handleRegister = async (name, email, password) => {
     try {
-      const res = await apiClient.post('/api/auth/register', { name, email, password, role });
+      const res = await apiClient.post('/api/auth/register', { name, email, password });
       if (res && res.user) {
         setCurrentUser(res.user);
         apiClient.setToken(res.token);
         return res.user;
       }
-    } catch (e) {
-      console.log("Auth backend fallback");
-    }
-    const newU = { id: `u_${Date.now()}`, name, email, role };
+    } catch (e) {}
+    const newU = { id: `u_${Date.now()}`, name, email };
     setCurrentUser(newU);
     return newU;
   };
@@ -330,7 +258,8 @@ export function CricketProvider({ children }) {
         soundEnabled,
         setSoundEnabled,
         match,
-        setMatch: handleCreateMatchState,
+        setMatch,
+        handleUpdateFieldingPositions,
         teams,
         setTeams,
         players,

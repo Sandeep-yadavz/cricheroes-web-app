@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Compass, RotateCcw, CheckCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
+import { Compass, CheckCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
-const INITIAL_FIELDERS = [
+const DEFAULT_FIELDERS = [
   { id: 'f1', name: 'Wicket Keeper', zone: 'Keeper', x: 200, y: 310, isFixed: true },
   { id: 'f2', name: '1st Slip', zone: 'Slips', x: 225, y: 315, isFixed: false },
   { id: 'f3', name: 'Point', zone: 'Point', x: 280, y: 200, isFixed: false },
@@ -17,8 +17,11 @@ const INITIAL_FIELDERS = [
 ];
 
 export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable = false }) {
-  const { match } = useCricket();
-  const [fielders, setFielders] = useState(INITIAL_FIELDERS);
+  const { match, handleUpdateFieldingPositions } = useCricket();
+
+  // Read synchronized fielding positions directly from match state
+  const fielders = match.fielding_positions || DEFAULT_FIELDERS;
+
   const [draggingId, setDraggingId] = useState(null);
   const [selectedZone, setSelectedZone] = useState('Cover');
   const [isPowerplay, setIsPowerplay] = useState(true);
@@ -34,12 +37,12 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
   };
 
   const handleStartDrag = (id, isFixed, e) => {
-    if (!isEditable || isFixed) return; // Only Assigned Scorer can drag fielders!
+    if (!isEditable || isFixed) return;
     e.preventDefault();
     setDraggingId(id);
   };
 
-  // Ultra-Smooth Window Pointer Listeners for effortless dragging
+  // Ultra-Smooth Window Pointer Listeners & Context Synchronization
   useEffect(() => {
     const handleWindowMove = (e) => {
       if (!draggingId || !isEditable) return;
@@ -48,14 +51,14 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
       const { x, y } = getSVGCoords(clientX, clientY);
       const zone = determineZone(x, y);
 
-      setFielders((prev) =>
-        prev.map((f) => {
-          if (f.id === draggingId && !f.isFixed) {
-            return { ...f, x, y, zone };
-          }
-          return f;
-        })
-      );
+      const updatedFielders = fielders.map((f) => {
+        if (f.id === draggingId && !f.isFixed) {
+          return { ...f, x, y, zone };
+        }
+        return f;
+      });
+
+      handleUpdateFieldingPositions(updatedFielders);
       setSelectedZone(zone);
       if (onZoneSelect) onZoneSelect(zone);
     };
@@ -77,14 +80,11 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
       window.removeEventListener('touchmove', handleWindowMove);
       window.removeEventListener('touchend', handleWindowEnd);
     };
-  }, [draggingId, isEditable]);
+  }, [draggingId, isEditable, fielders]);
 
   // Click directly anywhere on field
   const handleFieldClick = (e) => {
-    if (!isEditable) {
-      return; // Read-only mode: do nothing
-    }
-    if (draggingId) return;
+    if (!isEditable || draggingId) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const { x, y } = getSVGCoords(clientX, clientY);
@@ -104,9 +104,8 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
     });
 
     if (targetFielder) {
-      setFielders((prev) =>
-        prev.map((f) => (f.id === targetFielder.id ? { ...f, x, y, zone } : f))
-      );
+      const updatedFielders = fielders.map((f) => (f.id === targetFielder.id ? { ...f, x, y, zone } : f));
+      handleUpdateFieldingPositions(updatedFielders);
       setSelectedZone(zone);
       if (onZoneSelect) onZoneSelect(zone);
     }
@@ -164,9 +163,9 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
             <Compass className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-heading font-extrabold text-white text-base">Field Placement &amp; Wagon Wheel</h3>
+            <h3 className="font-heading font-extrabold text-white text-base">Synchronized Field Placement Console</h3>
             <p className="text-[11px] text-slate-400">
-              {isEditable ? '🛡️ You are Assigned Scorer • Drag fielders to set placement' : '👁️ Spectator Mode • Field positions locked in read-only view'}
+              {isEditable ? '🛡️ Live Syncing to Match Center &amp; Scorecard' : '👁️ Live Spectator View • Synced to Official Scorer'}
             </p>
           </div>
         </div>
@@ -174,12 +173,12 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
         {/* Active Mode Badge */}
         <div className="flex items-center space-x-2">
           {isEditable ? (
-            <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#00D26A]/20 text-[#00D26A] border border-[#00D26A]/40 flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> Scorer Editable
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#00D26A]/20 text-[#00D26A] border border-[#00D26A]/40 flex items-center gap-1 animate-pulse">
+              <CheckCircle className="w-3 h-3" /> Live Scorer Syncing
             </span>
           ) : (
             <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
-              <Lock className="w-3 h-3 text-amber-400" /> Read-Only Locked
+              <Lock className="w-3 h-3 text-amber-400" /> Synced Read-Only
             </span>
           )}
         </div>
