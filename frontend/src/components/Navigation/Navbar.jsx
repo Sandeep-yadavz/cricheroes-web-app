@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, UserCheck, LogOut, Lock } from 'lucide-react';
+import { Shield, Radio, Trophy, Users, Calculator, Volume2, VolumeX, Flame, PlusCircle, UserCheck, LogOut, Lock, Sparkles } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 import CreateMatchModal from '../Scorer/CreateMatchModal';
 import AuthModal from '../Auth/AuthModal';
@@ -75,6 +75,18 @@ export default function Navbar() {
             </button>
 
             <button
+              onClick={() => setActiveTab('fantasy')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                activeTab === 'fantasy'
+                  ? 'bg-[#00D26A] text-black shadow-md shadow-[#00D26A]/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Fantasy XI</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('players')}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 activeTab === 'players'
@@ -101,8 +113,6 @@ export default function Navbar() {
 
           {/* Controls: Auth User, New Match, Sound */}
           <div className="flex items-center space-x-3">
-            
-            {/* User Profile / Auth Button */}
             {currentUser ? (
               <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">

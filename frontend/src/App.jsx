@@ -8,6 +8,7 @@ import TournamentCenter from './components/Tournaments/TournamentCenter';
 import PlayerHub from './components/Players/PlayerHub';
 import NRRModal from './components/NRRCalculator/NRRModal';
 import LoginPage from './components/Auth/LoginPage';
+import FantasyHub from './components/Fantasy/FantasyHub';
 
 function MainLayout() {
   const { activeTab } = useCricket();
@@ -20,6 +21,7 @@ function MainLayout() {
         {activeTab === 'match_center' && <MatchCenter />}
         {activeTab === 'scorer' && <ScorerControl />}
         {activeTab === 'tournaments' && <TournamentCenter />}
+        {activeTab === 'fantasy' && <FantasyHub />}
         {activeTab === 'players' && <PlayerHub />}
         {activeTab === 'nrr' && <NRRModal />}
         {activeTab === 'login' && <LoginPage />}
