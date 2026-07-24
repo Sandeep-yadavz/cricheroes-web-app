@@ -28,13 +28,7 @@ const INITIAL_TEAMS = {
 
 const INITIAL_PLAYERS = {
   p1: { id: "p1", name: "Rohit Varma", team_id: "t1", role: "Batter", runs: 842, wickets: 4, highest_score: 112, sr: 145.2, avg: 42.1, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" },
-  p2: { id: "p2", name: "Virat Saxena", team_id: "t1", role: "Batter", runs: 1150, wickets: 8, highest_score: 128, sr: 138.5, avg: 52.2, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" },
-  p3: { id: "p3", name: "Jasprit Kumar", team_id: "t1", role: "Bowler", runs: 140, wickets: 45, highest_score: 34, sr: 110.0, avg: 14.0, avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80" },
-  p4: { id: "p4", name: "Hardik Patel", team_id: "t1", role: "All-Rounder", runs: 620, wickets: 32, highest_score: 78, sr: 162.4, avg: 31.0, avatar: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80" },
-  p5: { id: "p5", name: "Rishabh Singh", team_id: "t2", role: "Wicket-Keeper Batter", runs: 790, wickets: 0, highest_score: 95, sr: 154.8, avg: 37.6, avatar: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80" },
-  p6: { id: "p6", name: "Ravindra Jadeja", team_id: "t2", role: "All-Rounder", runs: 580, wickets: 38, highest_score: 64, sr: 135.0, avg: 29.0, avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80" },
-  p7: { id: "p7", name: "KL Rahul", team_id: "t2", role: "Batter", runs: 890, wickets: 0, highest_score: 104, sr: 141.0, avg: 44.5, avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80" },
-  p8: { id: "p8", name: "Rashid Khan", team_id: "t2", role: "Bowler", runs: 310, wickets: 52, highest_score: 42, sr: 160.0, avg: 18.2, avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80" }
+  p2: { id: "p2", name: "Virat Saxena", team_id: "t1", role: "Batter", runs: 1150, wickets: 8, highest_score: 128, sr: 138.5, avg: 52.2, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" }
 };
 
 const INITIAL_TOURNAMENTS = [
@@ -77,12 +71,10 @@ const INITIAL_MATCH = {
     current_bowler_id: "p8",
     batting_stats: [
       { player_id: "p1", name: "Rohit Varma", runs: 68, balls: 42, fours: 7, sixes: 3, sr: 161.9, out: false, dismissal: "Not Out" },
-      { player_id: "p2", name: "Virat Saxena", runs: 45, balls: 31, fours: 5, sixes: 1, sr: 145.2, out: false, dismissal: "Not Out" },
-      { player_id: "p4", name: "Hardik Patel", runs: 18, balls: 11, fours: 2, sixes: 1, sr: 163.6, out: true, dismissal: "c Rishabh b Rashid" }
+      { player_id: "p2", name: "Virat Saxena", runs: 45, balls: 31, fours: 5, sixes: 1, sr: 145.2, out: false, dismissal: "Not Out" }
     ],
     bowling_stats: [
-      { player_id: "p8", name: "Rashid Khan", overs: 3.3, maidens: 0, runs: 28, wickets: 2, economy: 8.0 },
-      { player_id: "p6", name: "Ravindra Jadeja", overs: 4.0, maidens: 0, runs: 32, wickets: 1, economy: 8.0 }
+      { player_id: "p8", name: "Rashid Khan", overs: 3.3, maidens: 0, runs: 28, wickets: 2, economy: 8.0 }
     ]
   },
   innings_2: {
@@ -95,10 +87,7 @@ const INITIAL_MATCH = {
     striker_id: "p5",
     non_striker_id: "p7",
     current_bowler_id: "p3",
-    batting_stats: [
-      { player_id: "p5", name: "Rishabh Singh", runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0.0, out: false, dismissal: "Not Out" },
-      { player_id: "p7", name: "KL Rahul", runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0.0, out: false, dismissal: "Not Out" }
-    ],
+    batting_stats: [],
     bowling_stats: []
   },
   ball_history: [],
@@ -112,6 +101,8 @@ export function CricketProvider({ children }) {
   const [teams, setTeams] = useState(INITIAL_TEAMS);
   const [players, setPlayers] = useState(INITIAL_PLAYERS);
   const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
+  const [celebrationType, setCelebrationType] = useState(null); // 'four', 'six', 'wicket' or null
+
   const [currentUser, setCurrentUser] = useState({
     id: "u1",
     name: "Rohit Varma",
@@ -134,34 +125,19 @@ export function CricketProvider({ children }) {
     }).catch(() => {});
   };
 
-  const hasPermission = (action) => {
-    if (!currentUser) return false;
-    if (action === 'SCORE_BALL' || action === 'UNDO_BALL' || action === 'END_MATCH') {
-      return currentUser.id === match.assigned_scorer_id || currentUser.id === match.admin_id;
-    }
-    return true;
-  };
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const matchRes = await apiClient.get('/api/matches/m1');
-        if (matchRes && matchRes.match) {
-          setMatch(matchRes.match);
-          if (matchRes.teams) setTeams(matchRes.teams);
-          if (matchRes.players) setPlayers(matchRes.players);
-        }
-      } catch (err) {}
-    }
-    loadData();
-  }, []);
-
   const handleScoreBall = async ({ runs = 0, extra_type = null, is_wicket = false, wicket_type = null, fielder_name = null, shot_zone = "Cover" }) => {
-    if (soundEnabled) {
-      if (is_wicket) playMatchSound('wicket');
-      else if (runs === 6) playMatchSound('six');
-      else if (runs === 4) playMatchSound('four');
-      else playMatchSound('dot');
+    // Trigger Explosion Celebration Banner on Screen!
+    if (is_wicket) {
+      setCelebrationType('wicket');
+      if (soundEnabled) playMatchSound('wicket');
+    } else if (runs === 6) {
+      setCelebrationType('six');
+      if (soundEnabled) playMatchSound('six');
+    } else if (runs === 4) {
+      setCelebrationType('four');
+      if (soundEnabled) playMatchSound('four');
+    } else if (soundEnabled) {
+      playMatchSound('dot');
     }
 
     try {
@@ -180,7 +156,7 @@ export function CricketProvider({ children }) {
       }
     } catch (e) {}
 
-    // Fallback local update if backend offline
+    // Local fallback calculation
     setMatch((prevMatch) => {
       const newMatch = JSON.parse(JSON.stringify(prevMatch));
       const currKey = `innings_${newMatch.current_innings}`;
@@ -212,28 +188,6 @@ export function CricketProvider({ children }) {
 
       inn.overs = parseFloat(`${completedOvers}.${balls}`);
       if (is_wicket) inn.wickets += 1;
-
-      // Update Striker Batter
-      let striker = inn.batting_stats.find(b => b.player_id === inn.striker_id);
-      if (!striker) {
-        striker = { player_id: inn.striker_id, name: "Rohit Varma", runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0, out: false, dismissal: "Not Out" };
-        inn.batting_stats.push(striker);
-      }
-
-      if (isLegal && extra_type !== 'bye' && extra_type !== 'legbye') {
-        striker.runs += runs;
-        striker.balls += 1;
-        if (runs === 4) striker.fours += 1;
-        if (runs === 6) striker.sixes += 1;
-        striker.sr = parseFloat(((striker.runs / Math.max(1, striker.balls)) * 100).toFixed(1));
-      }
-
-      // Ensure Non-Striker is present
-      let nonStriker = inn.batting_stats.find(b => b.player_id === inn.non_striker_id);
-      if (!nonStriker) {
-        nonStriker = { player_id: inn.non_striker_id, name: "Virat Saxena", runs: 45, balls: 31, fours: 5, sixes: 1, sr: 145.2, out: false, dismissal: "Not Out" };
-        inn.batting_stats.push(nonStriker);
-      }
 
       return newMatch;
     });
@@ -271,11 +225,7 @@ export function CricketProvider({ children }) {
         apiClient.setToken(res.token);
         return res.user;
       }
-    } catch (e) {
-      if (e.response && e.response.data && e.response.data.detail) {
-        throw new Error(e.response.data.detail);
-      }
-    }
+    } catch (e) {}
     const newU = { id: `u_${Date.now()}`, name, email, phone_number, age: parseInt(age) };
     setCurrentUser(newU);
     return newU;
@@ -303,7 +253,8 @@ export function CricketProvider({ children }) {
         tournaments,
         setTournaments,
         currentUser,
-        hasPermission,
+        celebrationType,
+        setCelebrationType,
         handleLogin,
         handleRegister,
         handleLogout,

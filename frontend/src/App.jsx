@@ -9,10 +9,11 @@ import FantasyHub from './components/Fantasy/FantasyHub';
 import PlayerHub from './components/Players/PlayerHub';
 import NRRModal from './components/NRRCalculator/NRRModal';
 import LoginPage from './components/Auth/LoginPage';
+import CelebrationOverlay from './components/Celebration/CelebrationOverlay';
 import { useCricket } from './context/CricketContext';
 
 export default function App() {
-  const { activeTab, currentUser } = useCricket();
+  const { activeTab, currentUser, celebrationType, setCelebrationType } = useCricket();
 
   // If user is not signed in / registered, present full-screen Login / Register Screen!
   if (!currentUser) {
@@ -50,6 +51,9 @@ export default function App() {
         {activeTab === 'players' && <PlayerHub />}
         {activeTab === 'nrr' && <NRRModal />}
       </main>
+
+      {/* Explosive Celebration Overlay for 4, 6, and Wicket */}
+      <CelebrationOverlay type={celebrationType} onClose={() => setCelebrationType(null)} />
 
       {/* Mobile Navigation TabBar */}
       <TabBar />
