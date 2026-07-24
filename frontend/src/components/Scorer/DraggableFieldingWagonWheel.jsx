@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Target, Shield, Move, RotateCcw, AlertTriangle, CheckCircle, Lock, Compass } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Compass, RotateCcw, CheckCircle, AlertTriangle, Move } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
 const INITIAL_FIELDERS = [
@@ -16,53 +16,98 @@ const INITIAL_FIELDERS = [
   { id: 'f11', name: 'Bowler', zone: 'Bowler', x: 200, y: 145, isFixed: true }
 ];
 
-export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone = "Cover" }) {
+export default function DraggableFieldingWagonWheel({ onZoneSelect }) {
   const { match } = useCricket();
   const [fielders, setFielders] = useState(INITIAL_FIELDERS);
   const [draggingId, setDraggingId] = useState(null);
-  const [shotMarker, setShotMarker] = useState({ x: 280, y: 120, zone: selectedZone });
+  const [selectedZone, setSelectedZone] = useState('Cover');
   const [isPowerplay, setIsPowerplay] = useState(true);
   const svgRef = useRef(null);
 
   // Convert mouse/touch coords to SVG 400x400 viewBox space
-  const getSVGCoords = (e) => {
+  const getSVGCoords = (clientX, clientY) => {
     if (!svgRef.current) return { x: 200, y: 200 };
     const rect = svgRef.current.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const x = Math.round(((clientX - rect.left) / rect.width) * 400);
     const y = Math.round(((clientY - rect.top) / rect.height) * 400);
-    return { x: Math.max(10, Math.min(390, x)), y: Math.max(10, Math.min(390, y)) };
+    return { x: Math.max(15, Math.min(385, x)), y: Math.max(15, Math.min(385, y)) };
   };
 
-  const handlePointerDown = (id, isFixed, e) => {
-    e.stopPropagation();
+  const handleStartDrag = (id, isFixed, e) => {
     if (isFixed) return; // Keeper & Bowler are fixed
+    e.preventDefault();
     setDraggingId(id);
   };
 
-  const handlePointerMove = (e) => {
-    if (!draggingId) return;
-    const { x, y } = getSVGCoords(e);
-
-    if (draggingId === 'shot_marker') {
+  // Ultra-Smooth Window Pointer Listeners for effortless dragging
+  useEffect(() => {
+    const handleWindowMove = (e) => {
+      if (!draggingId) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const { x, y } = getSVGCoords(clientX, clientY);
       const zone = determineZone(x, y);
-      setShotMarker({ x, y, zone });
-      if (onZoneSelect) onZoneSelect(zone);
-    } else {
+
       setFielders((prev) =>
         prev.map((f) => {
           if (f.id === draggingId && !f.isFixed) {
-            return { ...f, x, y, zone: determineZone(x, y) };
+            return { ...f, x, y, zone };
           }
           return f;
         })
       );
-    }
-  };
+      setSelectedZone(zone);
+      if (onZoneSelect) onZoneSelect(zone);
+    };
 
-  const handlePointerUp = () => {
-    setDraggingId(null);
+    const handleWindowEnd = () => {
+      setDraggingId(null);
+    };
+
+    if (draggingId) {
+      window.addEventListener('mousemove', handleWindowMove);
+      window.addEventListener('mouseup', handleWindowEnd);
+      window.addEventListener('touchmove', handleWindowMove);
+      window.addEventListener('touchend', handleWindowEnd);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMove);
+      window.removeEventListener('mouseup', handleWindowEnd);
+      window.removeEventListener('touchmove', handleWindowMove);
+      window.removeEventListener('touchend', handleWindowEnd);
+    };
+  }, [draggingId]);
+
+  // Click directly anywhere on field to move nearest movable fielder smoothly!
+  const handleFieldClick = (e) => {
+    if (draggingId) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const { x, y } = getSVGCoords(clientX, clientY);
+    const zone = determineZone(x, y);
+
+    // Find nearest non-fixed fielder
+    let minDistance = Infinity;
+    let targetFielder = null;
+
+    fielders.forEach((f) => {
+      if (!f.isFixed) {
+        const d = Math.hypot(f.x - x, f.y - y);
+        if (d < minDistance) {
+          minDistance = d;
+          targetFielder = f;
+        }
+      }
+    });
+
+    if (targetFielder) {
+      setFielders((prev) =>
+        prev.map((f) => (f.id === targetFielder.id ? { ...f, x, y, zone } : f))
+      );
+      setSelectedZone(zone);
+      if (onZoneSelect) onZoneSelect(zone);
+    }
   };
 
   // Determine Cricket Zone based on coordinates
@@ -86,11 +131,8 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
   const validateFieldingRules = () => {
     let errors = [];
 
-    // 1. Outside 30-Yard Circle Count (Radius = 90px from center 200,200)
     let outside30Yard = 0;
-    // 2. Leg Side Count (x < 200)
     let legSideCount = 0;
-    // 3. Behind Square Leg on Leg Side (x < 200, y > 235) - Law 28.4
     let deepBehindSquareLeg = 0;
 
     fielders.forEach((f) => {
@@ -106,7 +148,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
 
     const maxOutside = isPowerplay ? 2 : 5;
     if (outside30Yard > maxOutside) {
-      errors.push(`Powerplay Rule: Max ${maxOutside} fielders allowed outside 30-yard circle (Current: ${outside30Yard})`);
+      errors.push(`Powerplay: Max ${maxOutside} fielders outside 30-yard circle (Current: ${outside30Yard})`);
     }
 
     if (legSideCount > 5) {
@@ -114,15 +156,14 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
     }
 
     if (deepBehindSquareLeg > 2) {
-      errors.push(`Law 28.4: Max 2 fielders allowed behind Square Leg on Leg Side (Current: ${deepBehindSquareLeg})`);
+      errors.push(`Law 28.4: Max 2 fielders behind Square Leg on Leg Side (Current: ${deepBehindSquareLeg})`);
     }
 
     return {
       isValid: errors.length === 0,
       errors,
       outside30Yard,
-      legSideCount,
-      deepBehindSquareLeg
+      legSideCount
     };
   };
 
@@ -138,15 +179,15 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
             <Compass className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-heading font-extrabold text-white text-base">MCC Rules Draggable Wagon Wheel</h3>
-            <p className="text-[11px] text-slate-400">Bowler &amp; Keeper fixed • Official fielding laws enforced</p>
+            <h3 className="font-heading font-extrabold text-white text-base">Smooth Field Placement Console</h3>
+            <p className="text-[11px] text-slate-400">Tap or drag any fielder • Bowler &amp; Keeper fixed</p>
           </div>
         </div>
 
         {/* Selected Zone Badge */}
         <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400">Target Zone:</span>
-          <span className="font-black text-[#00D26A]">{shotMarker.zone}</span>
+          <span className="text-[10px] font-extrabold uppercase text-slate-400">Active Zone:</span>
+          <span className="font-black text-[#00D26A]">{selectedZone}</span>
         </div>
       </div>
 
@@ -160,7 +201,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
           {ruleStatus.isValid ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
           <span>
             {ruleStatus.isValid
-              ? `✅ Legal Field Setup (${isPowerplay ? 'Powerplay 1-6 Overs' : 'Non-Powerplay'} • ${ruleStatus.outside30Yard} Outside 30-Yd • ${ruleStatus.legSideCount}/5 Leg Side)`
+              ? `✅ Legal Field (${isPowerplay ? 'Powerplay 1-6' : 'Normal'} • ${ruleStatus.outside30Yard} Outside 30-Yd • ${ruleStatus.legSideCount}/5 Leg Side)`
               : ruleStatus.errors[0]}
           </span>
         </div>
@@ -170,7 +211,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
           onClick={() => setIsPowerplay(!isPowerplay)}
           className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-extrabold text-slate-300 hover:text-white uppercase"
         >
-          {isPowerplay ? '⚡ Mode: Powerplay (Max 2)' : '🛡️ Mode: Normal (Max 5)'}
+          {isPowerplay ? '⚡ Powerplay (Max 2)' : '🛡️ Normal (Max 5)'}
         </button>
       </div>
 
@@ -179,16 +220,13 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
         <svg
           ref={svgRef}
           viewBox="0 0 400 400"
-          className="w-full h-full cursor-crosshair touch-none"
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
+          className="w-full h-full cursor-pointer touch-none"
+          onClick={handleFieldClick}
         >
           {/* Outfield Grass */}
           <circle cx="200" cy="200" r="190" fill="#0A2619" stroke="#00D26A" strokeWidth="3" />
 
-          {/* 30-Yard Circle (Highlight Red if rule violated) */}
+          {/* 30-Yard Circle */}
           <circle
             cx="200"
             cy="200"
@@ -205,61 +243,49 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
           <line x1="184" y1="235" x2="216" y2="235" stroke="#FFFFFF" strokeWidth="2" />
 
           {/* Sector Labels */}
-          <text x="320" y="100" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">COVER</text>
-          <text x="330" y="205" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">POINT</text>
-          <text x="290" y="320" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">THIRD MAN</text>
-          <text x="70" y="320" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">FINE LEG</text>
-          <text x="40" y="205" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">SQ LEG</text>
-          <text x="50" y="100" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">MID WICKET</text>
-          <text x="140" y="45" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">MID ON</text>
-          <text x="230" y="45" fill="rgba(255,255,255,0.4)" fontSize="10" fontWeight="bold">MID OFF</text>
-
-          {/* Shot Vector Line */}
-          <line
-            x1="200"
-            y1="235"
-            x2={shotMarker.x}
-            y2={shotMarker.y}
-            stroke="#00D26A"
-            strokeWidth="3"
-            strokeDasharray="4 2"
-          />
-
-          {/* Shot Target Marker */}
-          <g
-            transform={`translate(${shotMarker.x}, ${shotMarker.y})`}
-            onMouseDown={(e) => handlePointerDown('shot_marker', false, e)}
-            onTouchStart={(e) => handlePointerDown('shot_marker', false, e)}
-            className="cursor-grab active:cursor-grabbing"
-          >
-            <circle r="12" fill="#00D26A" fillOpacity="0.3" stroke="#00D26A" strokeWidth="2" />
-            <circle r="5" fill="#00D26A" />
-          </g>
+          <text x="320" y="100" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">COVER</text>
+          <text x="330" y="205" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">POINT</text>
+          <text x="290" y="320" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">THIRD MAN</text>
+          <text x="70" y="320" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">FINE LEG</text>
+          <text x="40" y="205" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">SQ LEG</text>
+          <text x="50" y="100" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">MID WICKET</text>
+          <text x="140" y="45" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">MID ON</text>
+          <text x="230" y="45" fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold" pointerEvents="none">MID OFF</text>
 
           {/* 11 Fielders */}
           {fielders.map((f) => {
             const isOutside = Math.hypot(f.x - 200, f.y - 200) > 90;
+            const isBeingDragged = draggingId === f.id;
+
             return (
               <g
                 key={f.id}
                 transform={`translate(${f.x}, ${f.y})`}
-                onMouseDown={(e) => handlePointerDown(f.id, f.isFixed, e)}
-                onTouchStart={(e) => handlePointerDown(f.id, f.isFixed, e)}
-                className={f.isFixed ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"}
+                onMouseDown={(e) => handleStartDrag(f.id, f.isFixed, e)}
+                onTouchStart={(e) => handleStartDrag(f.id, f.isFixed, e)}
+                className={f.isFixed ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"}
               >
-                <circle
-                  r="10"
-                  fill={f.isFixed ? "#0066FF" : (isOutside ? "#FF9900" : "#FF3366")}
-                  stroke={f.isFixed ? "#66B2FF" : "#FFFFFF"}
-                  strokeWidth="2"
-                />
-                {f.isFixed && (
-                  <circle r="3" fill="#FFFFFF" />
+                {/* Large Invisible Hit Area for Easy Touch/Drag */}
+                <circle r="22" fill="transparent" />
+
+                {/* Outer Glow Ring on Active Drag */}
+                {isBeingDragged && (
+                  <circle r="16" fill="none" stroke="#00D26A" strokeWidth="2.5" className="animate-ping" />
                 )}
+
+                {/* Visible Fielder Marker */}
+                <circle
+                  r={isBeingDragged ? "13" : "11"}
+                  fill={f.isFixed ? "#0066FF" : (isOutside ? "#FF9900" : "#FF3366")}
+                  stroke={f.isFixed ? "#66B2FF" : (isBeingDragged ? "#00D26A" : "#FFFFFF")}
+                  strokeWidth="2.5"
+                  className="shadow-xl transition-all"
+                />
+
                 <text y="3.5" textAnchor="middle" fill="#FFFFFF" fontSize="8" fontWeight="bold" pointerEvents="none">
                   {f.name.charAt(0)}
                 </text>
-                <text y="-13" textAnchor="middle" fill="#A1A1AA" fontSize="7" fontWeight="bold" pointerEvents="none">
+                <text y="-14" textAnchor="middle" fill="#FFFFFF" fontSize="7" fontWeight="extrabold" pointerEvents="none">
                   {f.name} {f.isFixed ? "🔒" : ""}
                 </text>
               </g>
@@ -267,7 +293,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, selectedZone
           })}
         </svg>
 
-        {/* Legend */}
+        {/* Legend & Instructions */}
         <div className="absolute bottom-3 left-3 right-3 bg-slate-900/95 border border-slate-800 px-3 py-1.5 rounded-xl text-center text-[10px] font-semibold text-slate-300 flex items-center justify-around">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#0066FF]"></span> 🔒 Bowler/Keeper (Fixed)</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#FF3366]"></span> Inside 30-Yd</span>
