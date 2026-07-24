@@ -102,8 +102,8 @@ export default function LiveScorecard() {
         </div>
       </div>
 
-      {/* Draggable Wagon Wheel & Fielder Positioning Widget */}
-      <DraggableFieldingWagonWheel />
+      {/* Read-Only Wagon Wheel on Scorecard View (isEditable = false) */}
+      <DraggableFieldingWagonWheel isEditable={false} />
 
     </div>
   );

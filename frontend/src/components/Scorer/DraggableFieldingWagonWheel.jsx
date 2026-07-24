@@ -16,7 +16,7 @@ const INITIAL_FIELDERS = [
   { id: 'f11', name: 'Bowler', zone: 'Bowler', x: 200, y: 145, isFixed: true }
 ];
 
-export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable = true }) {
+export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable = false }) {
   const { match } = useCricket();
   const [fielders, setFielders] = useState(INITIAL_FIELDERS);
   const [draggingId, setDraggingId] = useState(null);
@@ -64,7 +64,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
       setDraggingId(null);
     };
 
-    if (draggingId) {
+    if (draggingId && isEditable) {
       window.addEventListener('mousemove', handleWindowMove);
       window.addEventListener('mouseup', handleWindowEnd);
       window.addEventListener('touchmove', handleWindowMove);
@@ -82,8 +82,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
   // Click directly anywhere on field
   const handleFieldClick = (e) => {
     if (!isEditable) {
-      alert("View-Only Mode: Only the Assigned Match Scorer can move fielders or change placements.");
-      return;
+      return; // Read-only mode: do nothing
     }
     if (draggingId) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -167,7 +166,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
           <div>
             <h3 className="font-heading font-extrabold text-white text-base">Field Placement &amp; Wagon Wheel</h3>
             <p className="text-[11px] text-slate-400">
-              {isEditable ? '🛡️ You are the Assigned Scorer • Drag fielders to update positions' : '👁️ Spectator Mode • Read-only field positions'}
+              {isEditable ? '🛡️ You are Assigned Scorer • Drag fielders to set placement' : '👁️ Spectator Mode • Field positions locked in read-only view'}
             </p>
           </div>
         </div>
@@ -180,7 +179,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
             </span>
           ) : (
             <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
-              <Eye className="w-3 h-3 text-amber-400" /> Read-Only
+              <Lock className="w-3 h-3 text-amber-400" /> Read-Only Locked
             </span>
           )}
         </div>
@@ -217,7 +216,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
         <svg
           ref={svgRef}
           viewBox="0 0 400 400"
-          className={`w-full h-full ${isEditable ? 'cursor-pointer touch-none' : 'cursor-default'}`}
+          className={`w-full h-full ${isEditable ? 'cursor-pointer touch-none' : 'cursor-default pointer-events-none'}`}
           onClick={handleFieldClick}
         >
           {/* Outfield Grass */}
