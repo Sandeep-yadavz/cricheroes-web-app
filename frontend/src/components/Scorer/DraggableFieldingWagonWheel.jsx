@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Compass, CheckCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
+import { Compass, CheckCircle, AlertTriangle, Lock } from 'lucide-react';
 import { useCricket } from '../../context/CricketContext';
 
 const DEFAULT_FIELDERS = [
@@ -19,7 +19,6 @@ const DEFAULT_FIELDERS = [
 export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable = false }) {
   const { match, handleUpdateFieldingPositions } = useCricket();
 
-  // Read synchronized fielding positions directly from match state
   const fielders = match.fielding_positions || DEFAULT_FIELDERS;
 
   const [draggingId, setDraggingId] = useState(null);
@@ -27,7 +26,6 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
   const [isPowerplay, setIsPowerplay] = useState(true);
   const svgRef = useRef(null);
 
-  // Convert mouse/touch coords to SVG 400x400 viewBox space
   const getSVGCoords = (clientX, clientY) => {
     if (!svgRef.current) return { x: 200, y: 200 };
     const rect = svgRef.current.getBoundingClientRect();
@@ -42,7 +40,6 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
     setDraggingId(id);
   };
 
-  // Ultra-Smooth Window Pointer Listeners & Context Synchronization
   useEffect(() => {
     const handleWindowMove = (e) => {
       if (!draggingId || !isEditable) return;
@@ -82,7 +79,6 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
     };
   }, [draggingId, isEditable, fielders]);
 
-  // Click directly anywhere on field
   const handleFieldClick = (e) => {
     if (!isEditable || draggingId) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -127,16 +123,25 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
     return 'Cover';
   };
 
+  // Comprehensive Both-Sides Fielding Law Validations (Leg Side & Off Side)
   const validateFieldingRules = () => {
     let errors = [];
     let outside30Yard = 0;
     let legSideCount = 0;
+    let offSideCount = 0;
+    let behindSquareLegCount = 0;
 
     fielders.forEach((f) => {
-      if (f.id === 'f1' || f.id === 'f11') return;
+      if (f.id === 'f1' || f.id === 'f11') return; // Exclude bowler and keeper
       const dist = Math.hypot(f.x - 200, f.y - 200);
       if (dist > 90) outside30Yard++;
-      if (f.x < 200) legSideCount++;
+
+      if (f.x < 200) {
+        legSideCount++;
+        if (f.y > 200) behindSquareLegCount++;
+      } else {
+        offSideCount++;
+      }
     });
 
     const maxOutside = isPowerplay ? 2 : 5;
@@ -148,7 +153,22 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
       errors.push(`Law 28.4: Max 5 fielders allowed on Leg Side (Current: ${legSideCount})`);
     }
 
-    return { isValid: errors.length === 0, errors, outside30Yard, legSideCount };
+    if (offSideCount > 7) {
+      errors.push(`Off Side Limit: Max 7 fielders allowed on Off Side (Current: ${offSideCount})`);
+    }
+
+    if (behindSquareLegCount > 2) {
+      errors.push(`Law 28.4: Max 2 fielders behind Square Leg (Current: ${behindSquareLegCount})`);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      outside30Yard,
+      legSideCount,
+      offSideCount,
+      behindSquareLegCount
+    };
   };
 
   const ruleStatus = validateFieldingRules();
@@ -163,9 +183,9 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
             <Compass className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-heading font-extrabold text-white text-base">Synchronized Field Placement Console</h3>
+            <h3 className="font-heading font-extrabold text-white text-base">Dual-Side Field Placement Console</h3>
             <p className="text-[11px] text-slate-400">
-              {isEditable ? '🛡️ Live Syncing to Match Center &amp; Scorecard' : '👁️ Live Spectator View • Synced to Official Scorer'}
+              {isEditable ? '🛡️ Live Syncing • Validating Off Side &amp; Leg Side Laws' : '👁️ Live Spectator View • Both Sides Field Status Synced'}
             </p>
           </div>
         </div>
@@ -174,7 +194,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
         <div className="flex items-center space-x-2">
           {isEditable ? (
             <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#00D26A]/20 text-[#00D26A] border border-[#00D26A]/40 flex items-center gap-1 animate-pulse">
-              <CheckCircle className="w-3 h-3" /> Live Scorer Syncing
+              <CheckCircle className="w-3 h-3" /> Scorer Editable
             </span>
           ) : (
             <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
@@ -184,7 +204,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
         </div>
       </div>
 
-      {/* Live Cricket Law Rule Validation Status Banner */}
+      {/* Live Cricket Law Rule Validation Banner for BOTH Sides */}
       <div className={`p-3 rounded-2xl border text-xs font-bold transition flex items-center justify-between ${
         ruleStatus.isValid
           ? 'bg-[#00D26A]/10 border-[#00D26A]/40 text-[#00D26A]'
@@ -194,7 +214,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
           {ruleStatus.isValid ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
           <span>
             {ruleStatus.isValid
-              ? `✅ Legal Field (${isPowerplay ? 'Powerplay 1-6' : 'Normal'} • ${ruleStatus.outside30Yard} Outside 30-Yd • ${ruleStatus.legSideCount}/5 Leg Side)`
+              ? `✅ Legal Field (${isPowerplay ? 'Powerplay' : 'Normal'} • ${ruleStatus.offSideCount}/7 Off Side • ${ruleStatus.legSideCount}/5 Leg Side)`
               : ruleStatus.errors[0]}
           </span>
         </div>
@@ -231,6 +251,9 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
             strokeWidth={ruleStatus.outside30Yard > (isPowerplay ? 2 : 5) ? "3" : "1.5"}
             strokeDasharray="6 4"
           />
+
+          {/* Center Dividing Line separating Off Side and Leg Side */}
+          <line x1="200" y1="10" x2="200" y2="390" stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="4 4" />
 
           {/* Pitch Rect */}
           <rect x="188" y="150" width="24" height="100" fill="#D2B48C" rx="2" opacity="0.9" />
@@ -287,7 +310,7 @@ export default function DraggableFieldingWagonWheel({ onZoneSelect, isEditable =
 
         {/* Legend */}
         <div className="absolute bottom-3 left-3 right-3 bg-slate-900/95 border border-slate-800 px-3 py-1.5 rounded-xl text-center text-[10px] font-semibold text-slate-300 flex items-center justify-around">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#0066FF]"></span> 🔒 Bowler/Keeper (Fixed)</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#0066FF]"></span> 🔒 Bowler/Keeper</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#FF3366]"></span> Inside 30-Yd</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#FF9900]"></span> Outside 30-Yd</span>
         </div>
