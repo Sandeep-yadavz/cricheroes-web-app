@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring, rich commentary generation, runouts, new batsman switching & fielding sync.",
-    version="2.6.0"
+    description="High performance Python FastAPI backend for scoring, UTF-8 emoji encoding, rich commentary generation, runouts, new batsman switching & fielding sync.",
+    version="2.7.0"
 )
 
 app.add_middleware(
@@ -63,17 +63,6 @@ INITIAL_BALL_HISTORY = [
     "bowler_name": "Rashid Khan",
     "shot_zone": "Mid Off",
     "description": "14.2 Rashid Khan to Rohit Varma, NO BALL + 1 RUN! Smashed firmly towards Mid Off! Free Hit coming up!"
-  },
-  {
-    "id": "b3",
-    "over": "14.1",
-    "runs": 6,
-    "extra_type": None,
-    "is_wicket": False,
-    "striker_name": "Rohit Varma",
-    "bowler_name": "Rashid Khan",
-    "shot_zone": "Mid Wicket",
-    "description": "14.1 Rashid Khan to Rohit Varma, SIX RUNS! Massive hit high into the stands at Mid Wicket!"
   }
 ]
 
@@ -166,7 +155,7 @@ def load_db():
         save_db(INITIAL_DATA)
         return INITIAL_DATA
     try:
-        with open(DB_FILE, "r") as f:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             if "users" not in data:
                 data["users"] = INITIAL_DATA["users"]
@@ -176,8 +165,8 @@ def load_db():
         return INITIAL_DATA
 
 def save_db(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 class UserRegisterInput(BaseModel):
     name: str
@@ -205,7 +194,7 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes Commentary & Database Engine (v2.6.0)</h1>")
+    return HTMLResponse("<h1>CricHeroes UTF-8 Emoji & Scoring Engine (v2.7.0)</h1>")
 
 @app.get("/api/search")
 def search_database(q: str = ""):
@@ -331,10 +320,6 @@ def get_match_detail(match_id: str):
         match = INITIAL_DATA["matches"][0]
         data["matches"].insert(0, match)
         save_db(data)
-    
-    if "ball_history" not in match or not match["ball_history"]:
-        match["ball_history"] = INITIAL_BALL_HISTORY
-        save_db(data)
 
     team_dict = {t["id"]: t for t in data.get("teams", [])}
     player_dict = {p["id"]: p for p in data.get("players", [])}
@@ -374,7 +359,6 @@ def score_ball(match_id: str, ball_data: BallInput):
 
     player_dict = {p["id"]: p for p in data.get("players", [])}
 
-    # Striker & Bowler Objects
     striker_id = inn.get("striker_id", "p1")
     striker_obj = player_dict.get(striker_id, {"name": "Rohit Varma"})
 
@@ -397,7 +381,6 @@ def score_ball(match_id: str, ball_data: BallInput):
 
     inn["runs"] += added_runs
 
-    # Update Overs & Balls
     completed_overs = int(inn["overs"])
     balls = int(round((inn["overs"] - completed_overs) * 10))
 
@@ -412,7 +395,6 @@ def score_ball(match_id: str, ball_data: BallInput):
 
     new_batter_obj = player_dict.get(new_batter_id, {"name": "Hardik Patel"})
 
-    # Process Wicket & New Batsman Entrance
     if is_wicket:
         inn["wickets"] += 1
         dismissed_id = inn.get("striker_id") if out_batter_type == "striker" else inn.get("non_striker_id")
@@ -449,7 +431,6 @@ def score_ball(match_id: str, ball_data: BallInput):
             "dismissal": "Not Out"
         })
 
-    # Striker Stats Update
     striker = next((b for b in inn["batting_stats"] if b["player_id"] == striker_id), None)
     if not striker:
         striker = {"player_id": striker_id, "name": striker_obj["name"], "runs": 0, "balls": 0, "fours": 0, "sixes": 0, "sr": 0.0, "out": False, "dismissal": "Not Out"}
@@ -465,11 +446,9 @@ def score_ball(match_id: str, ball_data: BallInput):
             striker["sixes"] += 1
         striker["sr"] = round((striker["runs"] / max(1, striker["balls"])) * 100, 1)
 
-    # Strike rotation on odd runs
     if not is_wicket and (runs_off_bat % 2 == 1 or added_runs % 2 == 1) and is_legal:
         inn["striker_id"], inn["non_striker_id"] = inn.get("non_striker_id"), inn.get("striker_id")
 
-    # Generate Detailed Natural Cricket Commentary
     b_name = bowler_obj.get("name", "Rashid Khan")
     s_name = striker_obj.get("name", "Rohit Varma")
 
@@ -513,14 +492,5 @@ def score_ball(match_id: str, ball_data: BallInput):
     
     match["ball_history"].insert(0, new_ball)
 
-    save_db(data)
-    return {"status": "success", "match": match}
-
-@app.post("/api/matches/{match_id}/undo-ball")
-def undo_ball(match_id: str):
-    data = load_db()
-    match = next((m for m in data["matches"] if m["id"] == match_id), None)
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
     save_db(data)
     return {"status": "success", "match": match}
