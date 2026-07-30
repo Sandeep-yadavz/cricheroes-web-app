@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="CricHeroes Grassroots Cricket API",
-    description="High performance Python FastAPI backend for scoring, UTF-8 emoji encoding, rich commentary generation, runouts, new batsman switching & fielding sync.",
-    version="2.7.0"
+    description="High performance Python FastAPI backend for scoring, UTF-8 emoji encoding, MongoDB Atlas database & Vercel deployment.",
+    version="3.0.0"
 )
 
 app.add_middleware(
@@ -22,7 +22,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Database Connection Settings
+MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("DATABASE_URL")
+mongo_client = None
+mongo_db = None
+
+if MONGODB_URI:
+    try:
+        from pymongo import MongoClient
+        mongo_client = MongoClient(MONGODB_URI)
+        mongo_db = mongo_client.get_database("cricheroes")
+    except Exception as e:
+        print(f"MongoDB Connection Warning: {e}")
+
+# Fallback Local DB File path (support /tmp for Vercel Serverless Function)
 DB_FILE = os.path.join(os.path.dirname(__file__), "database.json")
+TMP_DB_FILE = "/tmp/database.json" if os.name != 'nt' else os.path.join(os.path.dirname(__file__), "database.json")
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
@@ -150,23 +165,55 @@ INITIAL_DATA = {
     ]
 }
 
+# Global In-Memory Cache
+MEMORY_CACHE = None
+
 def load_db():
-    if not os.path.exists(DB_FILE):
-        save_db(INITIAL_DATA)
-        return INITIAL_DATA
-    try:
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if "users" not in data:
-                data["users"] = INITIAL_DATA["users"]
-                save_db(data)
-            return data
-    except Exception:
-        return INITIAL_DATA
+    global MEMORY_CACHE
+    if mongo_db is not None:
+        try:
+            db_doc = mongo_db.app_state.find_one({"_id": "main_state"})
+            if db_doc and "data" in db_doc:
+                return db_doc["data"]
+        except Exception:
+            pass
+
+    if MEMORY_CACHE is not None:
+        return MEMORY_CACHE
+
+    target_file = DB_FILE if os.path.exists(DB_FILE) else TMP_DB_FILE
+    if os.path.exists(target_file):
+        try:
+            with open(target_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if "users" not in data:
+                    data["users"] = INITIAL_DATA["users"]
+                MEMORY_CACHE = data
+                return data
+        except Exception:
+            pass
+
+    MEMORY_CACHE = INITIAL_DATA
+    return INITIAL_DATA
 
 def save_db(data):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    global MEMORY_CACHE
+    MEMORY_CACHE = data
+
+    if mongo_db is not None:
+        try:
+            mongo_db.app_state.replace_one({"_id": "main_state"}, {"_id": "main_state", "data": data}, upsert=True)
+            return
+        except Exception:
+            pass
+
+    for target in [TMP_DB_FILE, DB_FILE]:
+        try:
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            break
+        except Exception:
+            continue
 
 class UserRegisterInput(BaseModel):
     name: str
@@ -194,7 +241,8 @@ class FieldingPositionsInput(BaseModel):
 
 @app.get("/")
 def root_index():
-    return HTMLResponse("<h1>CricHeroes UTF-8 Emoji & Scoring Engine (v2.7.0)</h1>")
+    db_mode = "MongoDB Atlas" if mongo_db is not None else "Local / Serverless Storage"
+    return HTMLResponse(f"<h1>CricHeroes API (v3.0.0)</h1><p>Database Engine: <strong>{db_mode}</strong></p>")
 
 @app.get("/api/search")
 def search_database(q: str = ""):
@@ -492,5 +540,14 @@ def score_ball(match_id: str, ball_data: BallInput):
     
     match["ball_history"].insert(0, new_ball)
 
+    save_db(data)
+    return {"status": "success", "match": match}
+
+@app.post("/api/matches/{match_id}/undo-ball")
+def undo_ball(match_id: str):
+    data = load_db()
+    match = next((m for m in data["matches"] if m["id"] == match_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
     save_db(data)
     return {"status": "success", "match": match}
